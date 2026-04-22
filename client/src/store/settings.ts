@@ -19,7 +19,7 @@ const localStorageAtoms = {
   autoScroll: atomWithLocalStorage('autoScroll', false),
   sidebarExpanded: atomWithLocalStorage(
     'unifiedSidebarExpanded',
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? false : true,
+    !(typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches),
   ),
   enableUserMsgMarkdown: atomWithLocalStorage<boolean>(
     LocalStorageKeys.ENABLE_USER_MSG_MARKDOWN,
@@ -70,6 +70,16 @@ const localStorageAtoms = {
   automaticPlayback: atomWithLocalStorage('automaticPlayback', false),
   playbackRate: atomWithLocalStorage<number | null>('playbackRate', null),
   cacheTTS: atomWithLocalStorage('cacheTTS', true),
+
+  // Transcription window state
+  showTranscriptionWindow: atomWithLocalStorage('showTranscriptionWindow', false),
+  vadMode: atomWithLocalStorage('vadMode', 'push-to-talk'),
+  transcriptionHistory: atom<
+    Array<{ id: string; speaker: string; text: string; timestamp: string }>
+  >({
+    key: 'transcriptionHistory',
+    default: [],
+  }),
 
   // Account settings
   UsernameDisplay: atomWithLocalStorage('UsernameDisplay', true),

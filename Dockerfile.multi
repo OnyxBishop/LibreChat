@@ -2,7 +2,7 @@
 # v0.8.5-rc1
 
 # Set configurable max-old-space-size with default
-ARG NODE_MAX_OLD_SPACE_SIZE=6144
+ARG NODE_MAX_OLD_SPACE_SIZE=4096
 
 # Base for all builds
 FROM node:22-alpine AS base-min

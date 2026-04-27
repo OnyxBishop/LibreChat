@@ -86,7 +86,7 @@ async function fetchOllamaModels(
  * @returns An array of trimmed values.
  */
 export function splitAndTrim(input: string | null | undefined): string[] {
-  if (!input || typeof input !== 'string') {
+  if (!input) {
     return [];
   }
   return input
@@ -116,15 +116,13 @@ export async function fetchModels({
   skipCache = false,
 }: FetchModelsParams): Promise<string[]> {
   let models: string[] = [];
+
+  const isCustom = !Object.values(EModelEndpoint).includes(name as EModelEndpoint);
+  if (!isCustom) {
+    return models;
+  }
+
   const baseURL = direct ? extractBaseURL(_baseURL ?? '') : _baseURL;
-
-  if (!baseURL && !azure) {
-    return models;
-  }
-
-  if (!apiKey) {
-    return models;
-  }
 
   const shouldCache = !skipCache && !(userIdQuery && user);
   const cacheKey = shouldCache ? modelsCacheKey(baseURL ?? '', apiKey) : '';

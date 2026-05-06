@@ -1,6 +1,7 @@
 import { memo, useMemo, useCallback } from 'react';
 import { ContentTypes } from 'librechat-data-provider';
 import type {
+  TFile,
   TMessageContentParts,
   SearchResultData,
   TAttachment,
@@ -13,6 +14,7 @@ import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
 import ToolCallGroup from './ToolCallGroup';
 import Container from './Container';
+import Image from './Image';
 import Part from './Part';
 
 type PartWithContextProps = {
@@ -111,6 +113,28 @@ const ContentParts = memo(function ContentParts({
   isLatestMessage,
 }: ContentPartsProps) {
   const attachmentMap = useMemo(() => mapAttachments(attachments ?? []), [attachments]);
+  const inlineImages = useMemo<TFile[]>(() => {
+    if (!attachments?.length) {
+      return [];
+    }
+    const result: TFile[] = [];
+    for (const att of attachments) {
+      if (!att || att.toolCallId) {
+        continue;
+      }
+      const file = att as Partial<TFile>;
+      if (typeof file.filepath !== 'string' || file.filepath.length === 0) {
+        continue;
+      }
+      const isImageMime = typeof file.type === 'string' && file.type.startsWith('image/');
+      const isImageDataUri = file.filepath.startsWith('data:image/');
+      if (!isImageMime && !isImageDataUri) {
+        continue;
+      }
+      result.push(att as TFile);
+    }
+    return result;
+  }, [attachments]);
   const effectiveIsSubmitting = isLatestMessage ? isSubmitting : false;
 
   const renderPart = useCallback(
@@ -242,6 +266,15 @@ const ContentParts = memo(function ContentParts({
           />
         );
       })}
+      {inlineImages.map((att, idx) => (
+        <Image
+          key={`inline-img-${att.file_id ?? `${messageId}-${idx}`}`}
+          imagePath={att.filepath}
+          altText={att.filename ?? 'Generated Image'}
+          width={att.width}
+          height={att.height}
+        />
+      ))}
     </SearchContext.Provider>
   );
 });

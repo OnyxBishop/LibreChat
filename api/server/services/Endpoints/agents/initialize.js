@@ -148,12 +148,14 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     appConfig?.summarization?.enabled === false ? { enabled: false } : { enabled: true };
 
   const eventHandlers = getDefaultHandlers({
+    req,
     res,
     toolExecuteOptions,
     summarizationOptions,
     aggregateContent,
     toolEndCallback,
     collectedUsage,
+    artifactPromises,
     streamId,
   });
 

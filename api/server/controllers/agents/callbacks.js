@@ -88,9 +88,19 @@ class ModelEndHandler {
    */
   processInlineImages(data, metadata) {
     if (!this.req || !this.artifactPromises) {
+      logger.warn('[ModelEndHandler] inline-image scan skipped (req/artifactPromises not wired)', {
+        hasReq: !!this.req,
+        hasArtifactPromises: !!this.artifactPromises,
+        runId: metadata?.run_id,
+      });
       return;
     }
     const images = extractInlineImagesFromOutput(data?.output);
+    logger.warn('[ModelEndHandler] inline-image scan: extracted', {
+      runId: metadata?.run_id,
+      count: images.length,
+      urlPrefixes: images.map((img) => img.url.slice(0, 30)),
+    });
     if (images.length === 0) {
       return;
     }
@@ -133,6 +143,30 @@ class ModelEndHandler {
     if (!graph || !metadata) {
       console.warn(`Graph or metadata not found in ${event} event`);
       return;
+    }
+
+    try {
+      const output = data?.output;
+      logger.warn('[ModelEndHandler] handle called', {
+        runId: metadata?.run_id,
+        provider: metadata?.provider,
+        hasReq: !!this.req,
+        hasArtifactPromises: !!this.artifactPromises,
+        contentType: Array.isArray(output?.content) ? 'array' : typeof output?.content,
+        contentLen: Array.isArray(output?.content) ? output.content.length : undefined,
+        contentTypes: Array.isArray(output?.content)
+          ? output.content.map((p) => (p && typeof p === 'object' ? p.type : typeof p))
+          : undefined,
+        additionalKwargKeys: output?.additional_kwargs
+          ? Object.keys(output.additional_kwargs)
+          : [],
+        hasImagesKwarg: Array.isArray(output?.additional_kwargs?.images),
+        imagesKwargLen: Array.isArray(output?.additional_kwargs?.images)
+          ? output.additional_kwargs.images.length
+          : undefined,
+      });
+    } catch (logErr) {
+      logger.warn('[ModelEndHandler] diag log failed', logErr);
     }
 
     /** @type {string | undefined} */

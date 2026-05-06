@@ -19,15 +19,60 @@ const { processCodeOutput } = require('~/server/services/Files/Code/process');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { saveBase64Image } = require('~/server/services/Files/process');
 
+/**
+ * Pulls inline image data URIs out of an LLM AIMessage. Covers two shapes seen in the wild:
+ *   1) `output.content` is an array of multimodal blocks → look for `{type:'image_url', image_url:string|{url}}`.
+ *   2) `output.additional_kwargs.images` (OpenRouter convention for Gemini's native image output) with the
+ *      same image_url block shape inside.
+ * Only `data:` URIs are returned — remote URLs are passed through unchanged so the client can fetch them.
+ */
+function extractInlineImagesFromOutput(output) {
+  if (!output) {
+    return [];
+  }
+  /** @type {Array<{ url: string }>} */
+  const images = [];
+  const pushPart = (part) => {
+    if (!part || typeof part !== 'object' || part.type !== 'image_url') {
+      return;
+    }
+    const url = typeof part.image_url === 'string' ? part.image_url : part.image_url?.url;
+    if (typeof url === 'string' && url.length > 0) {
+      images.push({ url });
+    }
+  };
+  if (Array.isArray(output.content)) {
+    for (const part of output.content) {
+      pushPart(part);
+    }
+  }
+  const kwargImages = output.additional_kwargs?.images;
+  if (Array.isArray(kwargImages)) {
+    for (const part of kwargImages) {
+      pushPart(part);
+    }
+  }
+  return images;
+}
+
 class ModelEndHandler {
   /**
-   * @param {Array<UsageMetadata>} collectedUsage
+   * @param {Object} options
+   * @param {Array<UsageMetadata>} options.collectedUsage
+   * @param {ServerRequest} [options.req]
+   * @param {ServerResponse} [options.res]
+   * @param {string | null} [options.streamId]
+   * @param {Promise<MongoFile | { filename: string; filepath: string; expires: number;} | null>[]} [options.artifactPromises]
    */
-  constructor(collectedUsage) {
+  constructor({ collectedUsage, req, res, streamId = null, artifactPromises } = {}) {
     if (!Array.isArray(collectedUsage)) {
       throw new Error('collectedUsage must be an array');
     }
     this.collectedUsage = collectedUsage;
+    this.req = req;
+    this.res = res;
+    this.streamId = streamId;
+    this.artifactPromises = artifactPromises;
   }
 
   finalize(errorMessage) {
@@ -35,6 +80,46 @@ class ModelEndHandler {
       return;
     }
     throw new Error(errorMessage);
+  }
+
+  /**
+   * Saves any inline images returned by the LLM in this turn and emits attachment SSE events.
+   * Only runs when req + artifactPromises were wired in (i.e. the user-facing chat flow).
+   */
+  processInlineImages(data, metadata) {
+    if (!this.req || !this.artifactPromises) {
+      return;
+    }
+    const images = extractInlineImagesFromOutput(data?.output);
+    if (images.length === 0) {
+      return;
+    }
+    const provider = metadata?.provider;
+    for (const { url } of images) {
+      if (!url.startsWith('data:')) {
+        continue;
+      }
+      this.artifactPromises.push(
+        (async () => {
+          const filename = `llm_inline_${nanoid()}`;
+          const file = await saveBase64Image(url, {
+            req: this.req,
+            filename,
+            endpoint: provider,
+            context: FileContext.image_generation,
+          });
+          const fileMetadata = Object.assign(file, {
+            messageId: metadata?.run_id,
+            conversationId: metadata?.thread_id,
+          });
+          writeAttachment(this.res, this.streamId, fileMetadata);
+          return fileMetadata;
+        })().catch((error) => {
+          logger.error('[ModelEndHandler] Error saving inline LLM image:', error);
+          return null;
+        }),
+      );
+    }
   }
 
   /**
@@ -67,6 +152,8 @@ class ModelEndHandler {
           conversationId: metadata.thread_id,
         });
       }
+
+      this.processInlineImages(data, metadata);
 
       const usage = data?.output?.usage_metadata;
       if (!usage) {
@@ -129,16 +216,20 @@ async function emitEvent(res, streamId, eventData) {
  * @param {ContentAggregator} options.aggregateContent - Content aggregator function.
  * @param {ToolEndCallback} options.toolEndCallback - Callback to use when tool ends.
  * @param {Array<UsageMetadata>} options.collectedUsage - The list of collected usage metadata.
+ * @param {ServerRequest} [options.req] - The server request object (used to save inline LLM images).
+ * @param {Promise<MongoFile | { filename: string; filepath: string; expires: number;} | null>[]} [options.artifactPromises] - Shared artifact promises array.
  * @param {string | null} [options.streamId] - The stream ID for resumable mode, or null for standard mode.
  * @param {ToolExecuteOptions} [options.toolExecuteOptions] - Options for event-driven tool execution.
  * @returns {Record<string, t.EventHandler>} The default handlers.
  * @throws {Error} If the request is not found.
  */
 function getDefaultHandlers({
+  req,
   res,
   aggregateContent,
   toolEndCallback,
   collectedUsage,
+  artifactPromises,
   streamId = null,
   toolExecuteOptions = null,
   summarizationOptions = null,
@@ -149,7 +240,13 @@ function getDefaultHandlers({
     );
   }
   const handlers = {
-    [GraphEvents.CHAT_MODEL_END]: new ModelEndHandler(collectedUsage),
+    [GraphEvents.CHAT_MODEL_END]: new ModelEndHandler({
+      collectedUsage,
+      req,
+      res,
+      streamId,
+      artifactPromises,
+    }),
     [GraphEvents.TOOL_END]: new ToolEndHandler(toolEndCallback, logger),
     [GraphEvents.ON_RUN_STEP]: {
       /**

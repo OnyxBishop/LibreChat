@@ -20,11 +20,18 @@ const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { saveBase64Image } = require('~/server/services/Files/process');
 
 /**
- * Pulls inline image data URIs out of an LLM AIMessage. Covers two shapes seen in the wild:
+ * Pulls inline image data URIs out of an LLM AIMessage. Covers three shapes seen in the wild:
  *   1) `output.content` is an array of multimodal blocks → look for `{type:'image_url', image_url:string|{url}}`.
  *   2) `output.additional_kwargs.images` (OpenRouter convention for Gemini's native image output) with the
  *      same image_url block shape inside.
- * Only `data:` URIs are returned — remote URLs are passed through unchanged so the client can fetch them.
+ *   3) `output.additional_kwargs.__raw_response.choices[*].{delta,message}.images` — the OpenAI-compatible
+ *      raw payload. `@langchain/openai` (0.5.x) maps only function_call/tool_calls/audio into the AIMessage
+ *      and silently drops a provider's non-standard `images` field; the raw response is the only place it
+ *      survives streaming aggregation. Requires `__includeRawResponse: true` on the LLM (set via the
+ *      endpoint's `addParams` in librechat.yaml). AiTunnel image models (e.g. gemini-2.5-flash-image) only
+ *      deliver the picture here.
+ * Only `data:` URIs are saved downstream — remote URLs are passed through unchanged so the client can fetch
+ * them. Results are de-duplicated by URL so the same picture isn't saved twice across sources.
  */
 function extractInlineImagesFromOutput(output) {
   if (!output) {
@@ -32,24 +39,33 @@ function extractInlineImagesFromOutput(output) {
   }
   /** @type {Array<{ url: string }>} */
   const images = [];
+  const seen = new Set();
   const pushPart = (part) => {
     if (!part || typeof part !== 'object' || part.type !== 'image_url') {
       return;
     }
     const url = typeof part.image_url === 'string' ? part.image_url : part.image_url?.url;
-    if (typeof url === 'string' && url.length > 0) {
+    if (typeof url === 'string' && url.length > 0 && !seen.has(url)) {
+      seen.add(url);
       images.push({ url });
     }
   };
-  if (Array.isArray(output.content)) {
-    for (const part of output.content) {
-      pushPart(part);
+  const pushParts = (parts) => {
+    if (Array.isArray(parts)) {
+      for (const part of parts) {
+        pushPart(part);
+      }
     }
+  };
+  if (Array.isArray(output.content)) {
+    pushParts(output.content);
   }
-  const kwargImages = output.additional_kwargs?.images;
-  if (Array.isArray(kwargImages)) {
-    for (const part of kwargImages) {
-      pushPart(part);
+  pushParts(output.additional_kwargs?.images);
+  const rawChoices = output.additional_kwargs?.__raw_response?.choices;
+  if (Array.isArray(rawChoices)) {
+    for (const choice of rawChoices) {
+      pushParts(choice?.delta?.images);
+      pushParts(choice?.message?.images);
     }
   }
   return images;
@@ -88,22 +104,15 @@ class ModelEndHandler {
    */
   processInlineImages(data, metadata) {
     if (!this.req || !this.artifactPromises) {
-      logger.warn('[ModelEndHandler] inline-image scan skipped (req/artifactPromises not wired)', {
-        hasReq: !!this.req,
-        hasArtifactPromises: !!this.artifactPromises,
-        runId: metadata?.run_id,
-      });
       return;
     }
     const images = extractInlineImagesFromOutput(data?.output);
-    logger.warn('[ModelEndHandler] inline-image scan: extracted', {
-      runId: metadata?.run_id,
-      count: images.length,
-      urlPrefixes: images.map((img) => img.url.slice(0, 30)),
-    });
     if (images.length === 0) {
       return;
     }
+    logger.info(
+      `[ModelEndHandler] inline images: saving ${images.length} (run ${metadata?.run_id})`,
+    );
     const provider = metadata?.provider;
     for (const { url } of images) {
       if (!url.startsWith('data:')) {
@@ -143,30 +152,6 @@ class ModelEndHandler {
     if (!graph || !metadata) {
       console.warn(`Graph or metadata not found in ${event} event`);
       return;
-    }
-
-    try {
-      const output = data?.output;
-      logger.warn('[ModelEndHandler] handle called', {
-        runId: metadata?.run_id,
-        provider: metadata?.provider,
-        hasReq: !!this.req,
-        hasArtifactPromises: !!this.artifactPromises,
-        contentType: Array.isArray(output?.content) ? 'array' : typeof output?.content,
-        contentLen: Array.isArray(output?.content) ? output.content.length : undefined,
-        contentTypes: Array.isArray(output?.content)
-          ? output.content.map((p) => (p && typeof p === 'object' ? p.type : typeof p))
-          : undefined,
-        additionalKwargKeys: output?.additional_kwargs
-          ? Object.keys(output.additional_kwargs)
-          : [],
-        hasImagesKwarg: Array.isArray(output?.additional_kwargs?.images),
-        imagesKwargLen: Array.isArray(output?.additional_kwargs?.images)
-          ? output.additional_kwargs.images.length
-          : undefined,
-      });
-    } catch (logErr) {
-      logger.warn('[ModelEndHandler] diag log failed', logErr);
     }
 
     /** @type {string | undefined} */

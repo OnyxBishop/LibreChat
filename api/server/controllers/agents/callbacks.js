@@ -68,7 +68,51 @@ function extractInlineImagesFromOutput(output) {
       pushParts(choice?.message?.images);
     }
   }
+  /**
+   * Fallback: if the structured shapes above yielded nothing, deep-scan the
+   * whole message for any `data:image/...` URI. Providers and LangChain
+   * versions stash generated images in shifting locations; this catches them
+   * wherever they land. Guarded against cycles (LangChain messages self-ref).
+   */
+  if (images.length === 0) {
+    collectDataImageUris(output, images, seen, new WeakSet(), 0);
+  }
   return images;
+}
+
+/**
+ * Recursively collects `data:image/...` URI strings from an arbitrary object,
+ * de-duplicating via the shared `seen` set and guarding against cyclic refs.
+ * @param {unknown} node
+ * @param {Array<{ url: string }>} out
+ * @param {Set<string>} seen
+ * @param {WeakSet<object>} visited
+ * @param {number} depth
+ */
+function collectDataImageUris(node, out, seen, visited, depth) {
+  if (node == null || depth > 10) {
+    return;
+  }
+  if (typeof node === 'string') {
+    if (node.startsWith('data:image') && !seen.has(node)) {
+      seen.add(node);
+      out.push({ url: node });
+    }
+    return;
+  }
+  if (typeof node !== 'object' || visited.has(node)) {
+    return;
+  }
+  visited.add(node);
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectDataImageUris(item, out, seen, visited, depth + 1);
+    }
+    return;
+  }
+  for (const key of Object.keys(node)) {
+    collectDataImageUris(node[key], out, seen, visited, depth + 1);
+  }
 }
 
 class ModelEndHandler {

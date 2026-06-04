@@ -25,7 +25,7 @@ const AITUNNEL_BASE_URL = (process.env.AITUNNEL_BASE_URL || 'https://api.aitunne
 );
 const AITUNNEL_API_KEY = process.env.AITUNNEL_API_KEY || '';
 const RERANK_MODEL = process.env.RERANK_MODEL || 'rerank-4-fast';
-const SCRAPE_TIMEOUT_MS = Number(process.env.SCRAPE_TIMEOUT_MS) || 8000;
+const SCRAPE_TIMEOUT_MS = Number(process.env.SCRAPE_TIMEOUT_MS) || 6500;
 const SCRAPE_CONCURRENCY = Number(process.env.SCRAPE_CONCURRENCY) || 3;
 const MAX_HTML_BYTES = Number(process.env.MAX_HTML_BYTES) || 5_000_000;
 const MAX_CONTENT_CHARS = Number(process.env.MAX_CONTENT_CHARS) || 100_000;
@@ -93,11 +93,38 @@ async function fetchHtml(url) {
 }
 
 /**
+ * Rewrites every href/src to an absolute URL against the page URL. Relative
+ * links (e.g. "/cinema/...") would otherwise reach `@librechat/agents`, whose
+ * reference formatter calls `new URL(link)` without a base and throws.
+ * @param {Document} document
+ * @param {string} baseUrl
+ */
+function absolutizeUrls(document, baseUrl) {
+  const fix = (selector, attr) => {
+    document.querySelectorAll(selector).forEach((el) => {
+      const raw = el.getAttribute(attr);
+      if (!raw) {
+        return;
+      }
+      try {
+        el.setAttribute(attr, new URL(raw, baseUrl).href);
+      } catch {
+        el.removeAttribute(attr);
+      }
+    });
+  };
+  fix('a[href]', 'href');
+  fix('img[src]', 'src');
+}
+
+/**
  * @param {string} html
+ * @param {string} url
  * @returns {{ markdown: string; contentHtml: string; title: string; excerpt: string }}
  */
-function extractArticle(html) {
+function extractArticle(html, url) {
   const { document } = parseHTML(html);
+  absolutizeUrls(document, url);
   let article = null;
   try {
     article = new Readability(document).parse();
@@ -111,6 +138,7 @@ function extractArticle(html) {
 
   if (!contentHtml) {
     const { document: fallbackDoc } = parseHTML(html);
+    absolutizeUrls(fallbackDoc, url);
     const body = fallbackDoc.querySelector('body');
     if (body) {
       body
@@ -153,7 +181,7 @@ async function scrapeOne(url) {
     return { success: false, error: reason };
   }
 
-  const { markdown, contentHtml, title, excerpt } = extractArticle(fetched.html);
+  const { markdown, contentHtml, title, excerpt } = extractArticle(fetched.html, url);
   if (!markdown) {
     return { success: false, error: 'no extractable content' };
   }

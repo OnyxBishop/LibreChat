@@ -94,8 +94,11 @@ async function fetchHtml(url) {
 
 /**
  * Rewrites every href/src to an absolute URL against the page URL. Relative
- * links (e.g. "/cinema/...") would otherwise reach `@librechat/agents`, whose
- * reference formatter calls `new URL(link)` without a base and throws.
+ * links (e.g. "/kino/...") would otherwise reach `@librechat/agents`, whose
+ * `processContent` reads them via cheerio as `originalUrl` and whose reference
+ * formatter calls `new URL(link)` without a base and throws (ERR_INVALID_URL).
+ * Covers exactly the selectors agents extracts: a[href], img[src],
+ * video[src], iframe[src] — plus source[src] for completeness.
  * @param {Document} document
  * @param {string} baseUrl
  */
@@ -115,6 +118,33 @@ function absolutizeUrls(document, baseUrl) {
   };
   fix('a[href]', 'href');
   fix('img[src]', 'src');
+  fix('video[src]', 'src');
+  fix('iframe[src]', 'src');
+  fix('source[src]', 'src');
+}
+
+/**
+ * Belt-and-suspenders pass over the FINAL content HTML string — the exact bytes
+ * `@librechat/agents` re-parses with cheerio. Readability's own `_fixRelativeUris`
+ * silently leaves links relative when the linkedom document has no `baseURI`, so
+ * absolutizing the source document alone isn't enough on every site. Re-parsing
+ * and absolutizing the produced fragment guarantees no relative URL escapes.
+ * @param {string} html
+ * @param {string} baseUrl
+ * @returns {string}
+ */
+function absolutizeHtmlString(html, baseUrl) {
+  if (!html) {
+    return html;
+  }
+  try {
+    const { document } = parseHTML(`<html><body>${html}</body></html>`);
+    absolutizeUrls(document, baseUrl);
+    const out = document.body?.innerHTML;
+    return out && out.length > 0 ? out : html;
+  } catch {
+    return html;
+  }
 }
 
 /**
@@ -147,6 +177,9 @@ function extractArticle(html, url) {
       contentHtml = body.innerHTML || '';
     }
   }
+
+  // Final guarantee: no relative URL survives into the bytes agents re-parses.
+  contentHtml = absolutizeHtmlString(contentHtml, url);
 
   let markdown = '';
   try {
@@ -221,6 +254,10 @@ app.post(['/v2/scrape', '/v1/scrape', '/scrape'], async (req, res) => {
     const result = await scrapeOne(url);
     if (!result.success) {
       console.error(`[scrape] ${url} -> ${result.error}`);
+    } else {
+      const html = result.data?.html || '';
+      const relative = (html.match(/(?:href|src)="\/(?!\/)/g) || []).length;
+      console.log(`[scrape] ok ${url} | md:${result.data?.markdown?.length ?? 0} relative:${relative}`);
     }
     res.json(result);
   } catch (error) {

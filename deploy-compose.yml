@@ -90,6 +90,17 @@ services:
     restart: always
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+  websearch-helper:
+    build:
+      context: ./websearch-helper
+    container_name: websearch-helper
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - PORT=8787
+      - AITUNNEL_BASE_URL=https://api.aitunnel.ru/v1
+      - RERANK_MODEL=rerank-4-fast
 
 volumes:
   pgdata2:

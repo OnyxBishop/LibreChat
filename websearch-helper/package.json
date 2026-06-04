@@ -1,0 +1,20 @@
+{
+  "name": "websearch-helper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lightweight RU-native web-search sidecar: Firecrawl-compatible scraper + Jina-compatible reranker proxy to AiTunnel.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.5.0",
+    "express": "^4.21.2",
+    "linkedom": "^0.18.5",
+    "turndown": "^7.2.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

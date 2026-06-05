@@ -15,18 +15,20 @@ function AttachLastImage() {
   if (!context) {
     return null;
   }
-  const { toggleState, debouncedChange } = context.attachLastImage;
+  const { toggleState, debouncedChange, isPinned } = context.attachLastImage;
   const checked = toggleState === true;
 
   return (
-    <CheckboxButton
-      className="max-w-fit"
-      checked={checked}
-      setValue={debouncedChange}
-      label={localize('com_ui_attach_last_image')}
-      isCheckedClassName="border-purple-600/40 bg-purple-500/10 hover:bg-purple-700/10"
-      icon={<ImagePlus className="icon-md" aria-hidden="true" />}
-    />
+    (checked || isPinned) && (
+      <CheckboxButton
+        className="max-w-fit"
+        checked={checked}
+        setValue={debouncedChange}
+        label={localize('com_ui_attach_last_image')}
+        isCheckedClassName="border-purple-600/40 bg-purple-500/10 hover:bg-purple-700/10"
+        icon={<ImagePlus className="icon-md" aria-hidden="true" />}
+      />
+    )
   );
 }
 

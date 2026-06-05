@@ -1,8 +1,19 @@
 import React, { useMemo } from 'react';
+import { Type, Image as ImageIcon, Video, AudioLines } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { Endpoint } from '~/common';
 import { useLocalize } from '~/hooks';
+import { CustomMenu as Menu } from '../CustomMenu';
 import { EndpointModelItem } from './EndpointModelItem';
 import { groupModelsByModality, modalityLabelKey } from '../modality';
+import type { ChatModality } from '../modality';
+
+const MODALITY_ICONS: Record<ChatModality, LucideIcon> = {
+  text: Type,
+  image: ImageIcon,
+  video: Video,
+  audio: AudioLines,
+};
 
 interface GroupedEndpointModelsProps {
   endpoint: Endpoint;
@@ -11,8 +22,8 @@ interface GroupedEndpointModelsProps {
 }
 
 /**
- * Renders a custom endpoint's models grouped by modality (Text / Image / Video
- * / Audio) with lightweight section headers. Utility models (embeddings, rerank,
+ * Renders a custom endpoint's models grouped by modality, each as its own nested
+ * dropdown (Text / Image / Video / Audio). Utility models (embeddings, rerank,
  * moderation) are filtered out — they can't be used as a chat model and belong
  * in their own places (e.g. a reranker in the web-search settings).
  *
@@ -44,30 +55,36 @@ export function GroupedEndpointModels({
     );
   }
 
-  // A single group doesn't need a header.
-  const showHeaders = groups.length > 1;
-
   return (
     <>
-      {groups.map((group) => (
-        <React.Fragment key={group.modality}>
-          {showHeaders && (
-            <div
-              role="presentation"
-              className="cursor-default px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-text-secondary first:pt-1"
-            >
-              {localize(modalityLabelKey(group.modality))}
-            </div>
-          )}
-          {group.models.map((model, modelIndex) => (
-            <EndpointModelItem
-              key={`${endpoint.value}${indexSuffix}-${group.modality}-${model.name}-${modelIndex}`}
-              modelId={model.name}
-              endpoint={endpoint}
-            />
-          ))}
-        </React.Fragment>
-      ))}
+      {groups.map((group) => {
+        const Icon = MODALITY_ICONS[group.modality];
+        return (
+          <Menu
+            id={`modality-${endpoint.value}${indexSuffix}-${group.modality}-menu`}
+            key={`modality-${endpoint.value}${indexSuffix}-${group.modality}`}
+            className="transition-opacity duration-200 ease-in-out"
+            label={
+              <div className="group flex w-full flex-shrink cursor-pointer items-center justify-between rounded-xl px-1 py-1 text-sm">
+                <div className="flex items-center gap-2">
+                  <Icon className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
+                  <span className="truncate text-left">
+                    {localize(modalityLabelKey(group.modality))}
+                  </span>
+                </div>
+              </div>
+            }
+          >
+            {group.models.map((model, modelIndex) => (
+              <EndpointModelItem
+                key={`${endpoint.value}${indexSuffix}-${group.modality}-${model.name}-${modelIndex}`}
+                modelId={model.name}
+                endpoint={endpoint}
+              />
+            ))}
+          </Menu>
+        );
+      })}
     </>
   );
 }

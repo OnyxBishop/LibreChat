@@ -33,6 +33,12 @@ async function getCustomConfigSpeech(req, res) {
       ttsExternal,
     };
 
+    /** Admin-curated allowlist of user-selectable STT models (used by the Speech settings dropdown). */
+    const sttModels = appConfig.speech?.stt?.openai?.models;
+    if (Array.isArray(sttModels) && sttModels.length > 0) {
+      settings.sttModels = sttModels;
+    }
+
     if (!appConfig.speech?.speechTab) {
       return res.status(200).send(settings);
     }

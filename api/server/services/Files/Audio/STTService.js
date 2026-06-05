@@ -186,20 +186,38 @@ class STTService {
   }
 
   /**
+   * Resolves the STT model for a request: honors a user-selected model only when it
+   * appears in the admin allowlist (`sttSchema.models`); otherwise falls back to the
+   * configured server default (`sttSchema.model`).
+   * @param {Object} sttSchema - The STT schema for the provider.
+   * @param {string} [requestedModel] - The model requested by the client (optional).
+   * @returns {string} The model to use for the transcription request.
+   */
+  resolveModel(sttSchema, requestedModel) {
+    const chosen = typeof requestedModel === 'string' ? requestedModel.trim() : '';
+    const allowed = Array.isArray(sttSchema?.models) ? sttSchema.models : null;
+    if (chosen && (!allowed || allowed.includes(chosen))) {
+      return chosen;
+    }
+    return sttSchema.model;
+  }
+
+  /**
    * Prepares the request for the OpenAI STT provider.
    * @param {Object} sttSchema - The STT schema for OpenAI.
    * @param {Stream} audioReadStream - The audio data to be transcribed.
    * @param {Object} audioFile - The audio file object (unused in OpenAI provider).
    * @param {string} language - The language code for the transcription.
+   * @param {string} [model] - The user-requested STT model (validated against the allowlist).
    * @returns {Array} An array containing the URL, data, and headers for the request.
    */
-  openAIProvider(sttSchema, audioReadStream, audioFile, language) {
+  openAIProvider(sttSchema, audioReadStream, audioFile, language, model) {
     const url = sttSchema?.url || 'https://api.openai.com/v1/audio/transcriptions';
     const apiKey = extractEnvVariable(sttSchema.apiKey) || '';
 
     const data = {
       file: audioReadStream,
-      model: sttSchema.model,
+      model: this.resolveModel(sttSchema, model),
     };
 
     const validLanguage = getValidatedLanguageCode(language);
@@ -222,10 +240,11 @@ class STTService {
    * @param {Buffer} audioBuffer - The audio data to be transcribed.
    * @param {Object} audioFile - The audio file object containing originalname, mimetype, and size.
    * @param {string} language - The language code for the transcription.
+   * @param {string} [_model] - The user-requested STT model (ignored for Azure; the deployment dictates the model).
    * @returns {Array} An array containing the URL, data, and headers for the request.
    * @throws {Error} If the audio file size exceeds 25MB or the audio file format is not accepted.
    */
-  azureOpenAIProvider(sttSchema, audioBuffer, audioFile, language) {
+  azureOpenAIProvider(sttSchema, audioBuffer, audioFile, language, _model) {
     const url = `${genAzureEndpoint({
       azureOpenAIApiInstanceName: extractEnvVariable(sttSchema?.instanceName),
       azureOpenAIApiDeploymentName: extractEnvVariable(sttSchema?.deploymentName),
@@ -272,10 +291,11 @@ class STTService {
    * @param {Buffer} requestData.audioBuffer - The audio data to be transcribed.
    * @param {Object} requestData.audioFile - The audio file object containing originalname, mimetype, and size.
    * @param {string} requestData.language - The language code for the transcription.
+   * @param {string} [requestData.model] - The user-requested STT model (validated against the allowlist).
    * @returns {Promise<string>} A promise that resolves to the transcribed text.
    * @throws {Error} If the provider is invalid, the response status is not 200, or the response data is missing.
    */
-  async sttRequest(provider, sttSchema, { audioBuffer, audioFile, language }) {
+  async sttRequest(provider, sttSchema, { audioBuffer, audioFile, language, model }) {
     const strategy = this.providerStrategies[provider];
     if (!strategy) {
       throw new Error('Invalid provider');
@@ -292,6 +312,7 @@ class STTService {
       audioReadStream,
       audioFile,
       language,
+      model,
     );
 
     const options = { headers };
@@ -340,7 +361,13 @@ class STTService {
     try {
       const [provider, sttSchema] = await this.getProviderSchema(req);
       const language = req.body?.language || '';
-      const text = await this.sttRequest(provider, sttSchema, { audioBuffer, audioFile, language });
+      const model = req.body?.model || '';
+      const text = await this.sttRequest(provider, sttSchema, {
+        audioBuffer,
+        audioFile,
+        language,
+        model,
+      });
       res.json({ text });
     } catch (error) {
       logAxiosError({ message: 'An error occurred while processing the audio:', error });

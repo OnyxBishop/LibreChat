@@ -8,7 +8,13 @@ export interface STTService {
   sttRequest(
     provider: string,
     schema: object,
-    params: { audioBuffer: Buffer; audioFile: AudioFileInfo },
+    params: {
+      audioBuffer: Buffer;
+      audioFile: AudioFileInfo;
+      language?: string;
+      /** User-selected STT model, validated against the admin allowlist. */
+      model?: string;
+    },
   ): Promise<string>;
 }
 

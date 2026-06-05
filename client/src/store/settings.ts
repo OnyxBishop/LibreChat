@@ -57,6 +57,8 @@ const localStorageAtoms = {
 
   speechToText: atomWithLocalStorage('speechToText', true),
   engineSTT: atomWithLocalStorage('engineSTT', 'browser'),
+  /** User-selected external STT model; empty string = use the server default. */
+  engineSTTModel: atomWithLocalStorage('engineSTTModel', ''),
   languageSTT: atomWithLocalStorage('languageSTT', ''),
   autoTranscribeAudio: atomWithLocalStorage('autoTranscribeAudio', false),
   decibelValue: atomWithLocalStorage('decibelValue', -45),

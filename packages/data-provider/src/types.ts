@@ -651,7 +651,11 @@ export type TGetRandomPromptsRequest = {
   skip: number;
 };
 
-export type TCustomConfigSpeechResponse = { [key: string]: string };
+export type TCustomConfigSpeechResponse = {
+  /** Admin-curated allowlist of user-selectable STT models (from `speech.stt.openai.models`). */
+  sttModels?: string[];
+  [key: string]: string | string[] | boolean | number | undefined;
+};
 
 export type TUserTermsResponse = {
   termsAccepted: boolean;

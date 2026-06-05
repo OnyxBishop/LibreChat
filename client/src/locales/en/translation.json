@@ -468,6 +468,8 @@
   "com_nav_enable_cache_tts": "Enable cache TTS",
   "com_nav_enable_cloud_browser_voice": "Use cloud-based voices",
   "com_nav_engine": "Engine",
+  "com_nav_engine_stt_model": "Speech-to-text model",
+  "com_nav_engine_stt_model_server_default": "Server default",
   "com_nav_enter_to_send": "Press Enter to send messages",
   "com_nav_export": "Export",
   "com_nav_export_all_message_branches": "Export all message branches",

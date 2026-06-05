@@ -23,7 +23,6 @@ const useSpeechToTextBrowser = (
   const timeoutRef = useRef<NodeJS.Timeout | null>();
   const [autoSendText] = useRecoilState(store.autoSendText);
   const [languageSTT] = useRecoilState<string>(store.languageSTT);
-  const [autoTranscribeAudio] = useRecoilState<boolean>(store.autoTranscribeAudio);
 
   const {
     listening,
@@ -32,6 +31,7 @@ const useSpeechToTextBrowser = (
     interimTranscript,
     isMicrophoneAvailable,
     browserSupportsSpeechRecognition,
+    browserSupportsContinuousListening,
   } = useSpeechRecognition();
   const isListening = useMemo(() => listening, [listening]);
 
@@ -95,9 +95,13 @@ const useSpeechToTextBrowser = (
     if (isListening === true) {
       SpeechRecognition.stopListening();
     } else {
+      // Keep the mic open until the user stops it manually instead of cutting off
+      // after a brief silence (the Web Speech API's default 'press-to-talk'). We can
+      // only do this where the browser supports continuous recognition; elsewhere we
+      // fall back to the single-utterance behavior so recognition still works.
       SpeechRecognition.startListening({
         language: languageSTT,
-        continuous: autoTranscribeAudio,
+        continuous: browserSupportsContinuousListening,
       });
     }
   };

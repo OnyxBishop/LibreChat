@@ -549,6 +549,12 @@ const sttOpenaiSchema = z.object({
   url: z.string().optional(),
   apiKey: z.string(),
   model: z.string(),
+  /**
+   * Optional admin-curated allowlist of STT models the user may pick from in the
+   * Speech settings. `model` stays the server default; a per-user choice is only
+   * honored if it appears in this list (see STTService.openAIProvider).
+   */
+  models: z.array(z.string()).optional(),
 });
 
 const sttAzureOpenAISchema = z.object({

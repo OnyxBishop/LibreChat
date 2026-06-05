@@ -15,6 +15,7 @@ import {
 } from './TTS';
 import {
   AutoTranscribeAudioSwitch,
+  EngineSTTModelDropdown,
   LanguageSTTDropdown,
   SpeechToTextSwitch,
   AutoSendTextSelector,
@@ -125,12 +126,18 @@ function Speech() {
   useEffect(() => {
     if (data && data.message !== 'not_found') {
       Object.entries(data).forEach(([key, value]) => {
+        // Skip non-scalar config (e.g. `sttModels`) — it's an allowlist consumed by the
+        // STT model dropdown, not a user setting to mirror into localStorage.
+        if (Array.isArray(value)) {
+          return;
+        }
+        const settingValue = value as string | number;
         // Only apply config values as defaults if no user preference exists in localStorage
         const existingValue = localStorage.getItem(key);
         if (existingValue === null && key !== 'sttExternal' && key !== 'ttsExternal') {
-          updateSetting(key, value);
+          updateSetting(key, settingValue);
         } else if (key === 'sttExternal' || key === 'ttsExternal') {
-          updateSetting(key, value);
+          updateSetting(key, settingValue);
         }
       });
     }
@@ -190,6 +197,7 @@ function Speech() {
         <div className="flex flex-col gap-3 text-sm text-text-primary">
           <SpeechToTextSwitch />
           <EngineSTTDropdown external={sttExternal} />
+          <EngineSTTModelDropdown external={sttExternal} />
           <LanguageSTTDropdown />
           <div className="h-px bg-border-medium" role="none" />
           <TextToSpeechSwitch />
@@ -205,6 +213,7 @@ function Speech() {
           <SpeechToTextSwitch />
 
           <EngineSTTDropdown external={sttExternal} />
+          <EngineSTTModelDropdown external={sttExternal} />
 
           <LanguageSTTDropdown />
           <div className="pb-2">

@@ -445,6 +445,8 @@
   "com_nav_enable_cache_tts": "Включить кэширование TTS",
   "com_nav_enable_cloud_browser_voice": "Использовать облачные голоса",
   "com_nav_engine": "Модель",
+  "com_nav_engine_stt_model": "Модель распознавания речи",
+  "com_nav_engine_stt_model_server_default": "По умолчанию (сервер)",
   "com_nav_enter_to_send": "Отправить сообщение нажатием Enter",
   "com_nav_export": "Экспорт",
   "com_nav_export_all_message_branches": "Экспортировать все ветки сообщений",

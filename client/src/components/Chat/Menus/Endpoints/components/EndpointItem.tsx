@@ -8,6 +8,7 @@ import type { Endpoint } from '~/common';
 import { CustomMenu as Menu, CustomMenuItem as MenuItem } from '../CustomMenu';
 import { useModelSelectorContext } from '../ModelSelectorContext';
 import { renderEndpointModels } from './EndpointModelItem';
+import { GroupedEndpointModels } from './GroupedEndpointModels';
 import { ModelSpecItem } from './ModelSpecItem';
 import { filterModels } from '../utils';
 import { useLocalize } from '~/hooks';
@@ -128,6 +129,14 @@ function EndpointMenuContent({
       )
     : null;
 
+  /**
+   * Group the browse view by modality for plain model endpoints (e.g. the
+   * AiTunnel custom endpoint with hundreds of bare model ids). Agents/assistants
+   * list custom entities, not LLM model ids, so they stay a flat list.
+   */
+  const groupByModality =
+    !isAgentsEndpoint(endpoint.value) && !isAssistantsEndpoint(endpoint.value);
+
   return (
     <>
       {endpointSpecs.map((spec: TModelSpec) => (
@@ -136,7 +145,15 @@ function EndpointMenuContent({
       {filteredModels
         ? renderEndpointModels(endpoint, endpoint.models || [], filteredModels, endpointIndex)
         : endpoint.models &&
-          renderEndpointModels(endpoint, endpoint.models, undefined, endpointIndex)}
+          (groupByModality ? (
+            <GroupedEndpointModels
+              endpoint={endpoint}
+              models={endpoint.models}
+              endpointIndex={endpointIndex}
+            />
+          ) : (
+            renderEndpointModels(endpoint, endpoint.models, undefined, endpointIndex)
+          ))}
     </>
   );
 }

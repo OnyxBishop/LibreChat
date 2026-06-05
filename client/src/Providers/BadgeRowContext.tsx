@@ -20,6 +20,7 @@ interface BadgeRowContextType {
   webSearch: ReturnType<typeof useToolToggle>;
   artifacts: ReturnType<typeof useToolToggle>;
   fileSearch: ReturnType<typeof useToolToggle>;
+  attachLastImage: ReturnType<typeof useToolToggle>;
   codeInterpreter: ReturnType<typeof useToolToggle>;
   codeApiKeyForm: ReturnType<typeof useCodeApiKeyForm>;
   searchApiKeyForm: ReturnType<typeof useSearchApiKeyForm>;
@@ -100,11 +101,13 @@ export default function BadgeRowProvider({
       const webSearchToggleKey = `${LocalStorageKeys.LAST_WEB_SEARCH_TOGGLE_}${storageSuffix}`;
       const fileSearchToggleKey = `${LocalStorageKeys.LAST_FILE_SEARCH_TOGGLE_}${storageSuffix}`;
       const artifactsToggleKey = `${LocalStorageKeys.LAST_ARTIFACTS_TOGGLE_}${storageSuffix}`;
+      const attachImageToggleKey = `${LocalStorageKeys.LAST_ATTACH_IMAGE_TOGGLE_}${storageSuffix}`;
 
       const codeToggleValue = getTimestampedValue(codeToggleKey);
       const webSearchToggleValue = getTimestampedValue(webSearchToggleKey);
       const fileSearchToggleValue = getTimestampedValue(fileSearchToggleKey);
       const artifactsToggleValue = getTimestampedValue(artifactsToggleKey);
+      const attachImageToggleValue = getTimestampedValue(attachImageToggleKey);
 
       const initialValues: Record<string, any> = {};
 
@@ -137,6 +140,14 @@ export default function BadgeRowProvider({
           initialValues[AgentCapabilities.artifacts] = JSON.parse(artifactsToggleValue);
         } catch (e) {
           console.error('Failed to parse artifacts toggle value:', e);
+        }
+      }
+
+      if (attachImageToggleValue !== null) {
+        try {
+          initialValues['attach_last_image'] = JSON.parse(attachImageToggleValue);
+        } catch (e) {
+          console.error('Failed to parse attach image toggle value:', e);
         }
       }
 
@@ -238,12 +249,22 @@ export default function BadgeRowProvider({
     isAuthenticated: true,
   });
 
+  /** "Edit last image" hook — client-only UX flag, no auth required */
+  const attachLastImage = useToolToggle({
+    conversationId,
+    storageContextKey,
+    toolKey: 'attach_last_image',
+    localStorageKey: LocalStorageKeys.LAST_ATTACH_IMAGE_TOGGLE_,
+    isAuthenticated: true,
+  });
+
   const mcpServerManager = useMCPServerManager({ conversationId, storageContextKey });
 
   const value: BadgeRowContextType = {
     webSearch,
     artifacts,
     fileSearch,
+    attachLastImage,
     agentsConfig,
     conversationId,
     storageContextKey,

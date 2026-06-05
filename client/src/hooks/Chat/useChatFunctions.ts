@@ -16,6 +16,7 @@ import {
   getDefaultParamsEndpoint,
 } from 'librechat-data-provider';
 import type {
+  TFile,
   TMessage,
   TSubmission,
   TConversation,
@@ -39,6 +40,48 @@ const logChatRequest = (request: Record<string, unknown>) => {
   logger.dir(request);
   logger.log('=====================================');
 };
+
+const IMAGE_FILE_EXT_REGEX = /\.(png|jpe?g|gif|webp|bmp|avif)(\?|#|$)/i;
+
+/** Minimal shape shared by uploaded files and generated-image attachments. */
+type ImageLikeFile = Pick<TFile, 'file_id' | 'filepath' | 'type' | 'height' | 'width'> & {
+  filename?: string;
+};
+
+function isImageLikeFile(file?: ImageLikeFile | null): boolean {
+  if (!file) {
+    return false;
+  }
+  if (typeof file.type === 'string' && file.type.startsWith('image/')) {
+    return true;
+  }
+  const path = file.filepath ?? file.filename ?? '';
+  return typeof path === 'string' && IMAGE_FILE_EXT_REGEX.test(path);
+}
+
+/**
+ * Finds the most recent image in the conversation — a generated-image
+ * attachment or an uploaded file — scanning messages newest-first. Used by the
+ * "edit last image" toggle to re-attach it to the next message.
+ */
+function findLastConversationImage(messages: TMessage[]): ImageLikeFile | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    const attachments = (message.attachments ?? []) as unknown as ImageLikeFile[];
+    for (let j = attachments.length - 1; j >= 0; j--) {
+      if (isImageLikeFile(attachments[j])) {
+        return attachments[j];
+      }
+    }
+    const files = (message.files ?? []) as ImageLikeFile[];
+    for (let j = files.length - 1; j >= 0; j--) {
+      if (isImageLikeFile(files[j])) {
+        return files[j];
+      }
+    }
+  }
+  return null;
+}
 
 export default function useChatFunctions({
   index = 0,
@@ -237,6 +280,33 @@ export default function useChatFunctions({
       }));
       setFiles(new Map());
       setFilesToDelete({});
+    }
+
+    /**
+     * "Edit last image" toggle: append the most recent image in the conversation
+     * so the model can edit it across turns. Added in addition to any manually
+     * attached files (deduped by file_id/filepath).
+     */
+    if (ephemeralAgent?.attach_last_image === true && Array.isArray(currentMessages)) {
+      const lastImage = findLastConversationImage(currentMessages);
+      if (lastImage && (lastImage.file_id != null || lastImage.filepath != null)) {
+        const attachedFiles = currentMsg.files ? [...currentMsg.files] : [];
+        const alreadyAttached = attachedFiles.some(
+          (file) =>
+            (lastImage.file_id != null && file.file_id === lastImage.file_id) ||
+            (lastImage.filepath != null && file.filepath === lastImage.filepath),
+        );
+        if (!alreadyAttached) {
+          attachedFiles.push({
+            file_id: lastImage.file_id,
+            filepath: lastImage.filepath,
+            type: lastImage.type ?? '',
+            height: lastImage.height,
+            width: lastImage.width,
+          });
+          currentMsg.files = attachedFiles;
+        }
+      }
     }
 
     const responseMessageId =

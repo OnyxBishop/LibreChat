@@ -101,6 +101,12 @@ export type TEphemeralAgent = {
   file_search?: boolean;
   execute_code?: boolean;
   artifacts?: string;
+  /**
+   * Client-only UX flag: when true, the most recent image in the conversation is
+   * attached to each new user message (multi-turn image editing). Carried in the
+   * ephemeralAgent so it persists per-conversation; the backend ignores it.
+   */
+  attach_last_image?: boolean;
 };
 
 export type TPayload = Partial<TMessage> &

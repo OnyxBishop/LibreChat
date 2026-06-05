@@ -82,10 +82,15 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
     attachLastImage ?? {};
 
   const showWebSearchSettings = useMemo(() => {
+    // A configurable reranker model is a preference (not a credential), so the
+    // settings gear must be reachable even when every auth category is system-defined.
+    const hasRerankerModels = (startupConfig?.webSearch?.rerankerModels?.length ?? 0) > 0;
     const authTypes = webSearchAuthData?.authTypes ?? [];
     if (authTypes.length === 0) return true;
-    return !authTypes.every(([, authType]) => authType === AuthType.SYSTEM_DEFINED);
-  }, [webSearchAuthData?.authTypes]);
+    return (
+      hasRerankerModels || !authTypes.every(([, authType]) => authType === AuthType.SYSTEM_DEFINED)
+    );
+  }, [webSearchAuthData?.authTypes, startupConfig?.webSearch?.rerankerModels]);
 
   const showCodeSettings = useMemo(
     () => codeAuthData?.message !== AuthType.SYSTEM_DEFINED,

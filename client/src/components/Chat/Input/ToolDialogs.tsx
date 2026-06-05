@@ -47,6 +47,7 @@ function ToolDialogs() {
         isOpen={searchDialogOpen}
         onRevoke={searchHandleRevoke}
         register={searchMethods.register}
+        setValue={searchMethods.setValue}
         onOpenChange={setSearchDialogOpen}
         handleSubmit={searchMethods.handleSubmit}
         triggerRefs={[searchMenuTriggerRef, searchBadgeTriggerRef]}

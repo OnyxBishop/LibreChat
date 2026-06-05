@@ -72,6 +72,8 @@ export function loadWebSearchConfig(
   const jinaApiKey = config?.jinaApiKey ?? '${JINA_API_KEY}';
   const jinaApiUrl = config?.jinaApiUrl ?? '${JINA_API_URL}';
   const cohereApiKey = config?.cohereApiKey ?? '${COHERE_API_KEY}';
+  /** Maps the per-user reranker-model choice to its plugin-auth field name. */
+  const rerankerModel = config?.rerankerModel ?? '${WEB_SEARCH_RERANK_MODEL}';
   const safeSearch = config?.safeSearch ?? SafeSearchTypes.MODERATE;
 
   return {
@@ -80,6 +82,7 @@ export function loadWebSearchConfig(
     jinaApiKey,
     jinaApiUrl,
     cohereApiKey,
+    rerankerModel,
     serperApiKey,
     searxngApiKey,
     firecrawlApiKey,

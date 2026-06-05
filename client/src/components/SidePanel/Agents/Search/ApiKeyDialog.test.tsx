@@ -32,6 +32,7 @@ const defaultProps = {
   ],
   isToolAuthenticated: false,
   register: mockRegister as any,
+  setValue: jest.fn() as any,
   handleSubmit: (fn: any) => (e: any) => fn(e),
 };
 

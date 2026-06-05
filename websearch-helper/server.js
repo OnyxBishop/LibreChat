@@ -276,6 +276,13 @@ app.post('/rerank', async (req, res) => {
     return;
   }
 
+  // The reranker model is chosen per-request via the ?model= query param, which
+  // LibreChat sets from the user's web-search settings. We deliberately ignore
+  // any body.model: @librechat/agents hard-codes it to a Jina model name that
+  // means nothing to AiTunnel. Falls back to the RERANK_MODEL env default.
+  const requestedModel = typeof req.query.model === 'string' ? req.query.model.trim() : '';
+  const model = requestedModel || RERANK_MODEL;
+
   try {
     const response = await fetch(`${AITUNNEL_BASE_URL}/rerank`, {
       method: 'POST',
@@ -283,12 +290,12 @@ app.post('/rerank', async (req, res) => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${AITUNNEL_API_KEY}`,
       },
-      body: JSON.stringify({ model: RERANK_MODEL, query, documents, top_n: topN ?? 5 }),
+      body: JSON.stringify({ model, query, documents, top_n: topN ?? 5 }),
     });
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      console.error(`[rerank] AiTunnel ${response.status}: ${text.slice(0, 200)}`);
+      console.error(`[rerank] AiTunnel ${response.status} (model: ${model}): ${text.slice(0, 200)}`);
       res.json({ results: [] });
       return;
     }

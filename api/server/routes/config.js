@@ -105,14 +105,16 @@ function buildWebSearchConfig(appConfig) {
   if (!ws) {
     return undefined;
   }
-  const { searchProvider, scraperProvider, rerankerType } = ws;
-  if (!searchProvider && !scraperProvider && !rerankerType) {
+  const { searchProvider, scraperProvider, rerankerType, rerankerModels } = ws;
+  const hasRerankerModels = Array.isArray(rerankerModels) && rerankerModels.length > 0;
+  if (!searchProvider && !scraperProvider && !rerankerType && !hasRerankerModels) {
     return undefined;
   }
   return {
     ...(searchProvider && { searchProvider }),
     ...(scraperProvider && { scraperProvider }),
     ...(rerankerType && { rerankerType }),
+    ...(hasRerankerModels && { rerankerModels }),
   };
 }
 

@@ -1,12 +1,12 @@
 import {
   AuthType,
+  RerankerTypes,
   SafeSearchTypes,
   SearchCategories,
   extractVariableName,
 } from 'librechat-data-provider';
 import { webSearchAuth } from '@librechat/data-schemas';
 import type {
-  RerankerTypes,
   TCustomConfig,
   SearchProviders,
   ScraperProviders,
@@ -70,6 +70,23 @@ export function extractWebSearchEnvVars({
   }
 
   return authFields;
+}
+
+/**
+ * Appends a `model` query param to the reranker URL. Used to carry the user's
+ * reranker-model choice to a Jina-compatible endpoint that takes the model from
+ * the query string (e.g. our self-hosted sidecar), since `@librechat/agents`
+ * hard-codes the request-body model and offers no model knob. Returns the URL
+ * unchanged if it can't be parsed.
+ */
+function appendModelParam(rawUrl: string, model: string): string {
+  try {
+    const url = new URL(rawUrl);
+    url.searchParams.set('model', model);
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
 }
 
 /**
@@ -243,6 +260,36 @@ export async function loadWebSearchAuth({
   authResult.scraperTimeout =
     webSearchConfig?.scraperTimeout ?? webSearchConfig?.firecrawlOptions?.timeout ?? 7500;
   authResult.firecrawlOptions = webSearchConfig?.firecrawlOptions;
+
+  /**
+   * Per-user reranker model override for the Jina-compatible reranker. Resolved
+   * here (outside the category-auth loop) so that picking a model never flips
+   * the reranker from system-defined to user-provided. The chosen model is
+   * encoded into `jinaApiUrl` as `?model=` — the only channel that reaches the
+   * reranker endpoint, since `@librechat/agents` sends a hard-coded body model.
+   */
+  if (authResult.rerankerType === RerankerTypes.JINA && authResult.jinaApiUrl) {
+    const modelEnvVars = extractWebSearchEnvVars({
+      keys: ['rerankerModel'] as TWebSearchKeys[],
+      config: webSearchConfig,
+    });
+    if (modelEnvVars.length > 0) {
+      const allowed = webSearchConfig?.rerankerModels;
+      const modelValues = await loadAuthValues({
+        userId,
+        authFields: modelEnvVars,
+        optional: new Set(modelEnvVars),
+        throwError: false,
+      });
+      const chosenModel = modelValues[modelEnvVars[0]];
+      if (typeof chosenModel === 'string' && chosenModel.length > 0) {
+        const isAllowed = !Array.isArray(allowed) || allowed.includes(chosenModel);
+        if (isAllowed) {
+          authResult.jinaApiUrl = appendModelParam(authResult.jinaApiUrl, chosenModel);
+        }
+      }
+    }
+  }
 
   return {
     authTypes,

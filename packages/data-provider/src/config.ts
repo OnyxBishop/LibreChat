@@ -865,6 +865,8 @@ export type TStartupConfig = {
     searchProvider?: SearchProviders;
     scraperProvider?: ScraperProviders;
     rerankerType?: RerankerTypes;
+    /** Reranker models the user may choose from in the web-search settings UI. */
+    rerankerModels?: string[];
   };
   mcpServers?: Record<
     string,
@@ -934,6 +936,13 @@ export const webSearchSchema = z.object({
   searchProvider: z.nativeEnum(SearchProviders).optional(),
   scraperProvider: z.nativeEnum(ScraperProviders).optional(),
   rerankerType: z.nativeEnum(RerankerTypes).optional(),
+  /**
+   * Per-user reranker model choice (resolved via the `WEB_SEARCH_RERANK_MODEL`
+   * plugin-auth field). Encoded into `jinaApiUrl` as `?model=` at request time.
+   */
+  rerankerModel: z.string().optional().default('${WEB_SEARCH_RERANK_MODEL}'),
+  /** Admin-curated list of reranker models the user may pick from in the UI. */
+  rerankerModels: z.array(z.string()).optional(),
   scraperTimeout: z.number().int().nonnegative().optional(),
   safeSearch: z.nativeEnum(SafeSearchTypes).default(SafeSearchTypes.MODERATE),
   firecrawlOptions: z

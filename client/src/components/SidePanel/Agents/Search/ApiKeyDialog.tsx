@@ -8,8 +8,9 @@ import {
   SearchCategories,
 } from 'librechat-data-provider';
 import type { SearchApiKeyFormData } from '~/hooks/Plugins/useAuthSearchTool';
-import type { UseFormRegister, UseFormHandleSubmit } from 'react-hook-form';
+import type { UseFormRegister, UseFormHandleSubmit, UseFormSetValue } from 'react-hook-form';
 import InputSection, { type DropdownOption } from './InputSection';
+import RerankerModelSection from './RerankerModelSection';
 import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 
@@ -21,6 +22,7 @@ export default function ApiKeyDialog({
   authTypes,
   isToolAuthenticated,
   register,
+  setValue,
   handleSubmit,
   triggerRef,
   triggerRefs,
@@ -32,12 +34,14 @@ export default function ApiKeyDialog({
   authTypes: [string, AuthType][];
   isToolAuthenticated: boolean;
   register: UseFormRegister<SearchApiKeyFormData>;
+  setValue: UseFormSetValue<SearchApiKeyFormData>;
   handleSubmit: UseFormHandleSubmit<SearchApiKeyFormData>;
   triggerRef?: React.RefObject<HTMLInputElement | HTMLButtonElement>;
   triggerRefs?: React.RefObject<HTMLInputElement | HTMLButtonElement>[];
 }) {
   const localize = useLocalize();
   const { data: config } = useGetStartupConfig();
+  const rerankerModels = config?.webSearch?.rerankerModels ?? [];
 
   const [selectedProvider, setSelectedProvider] = useState(
     config?.webSearch?.searchProvider || SearchProviders.SERPER,
@@ -238,6 +242,15 @@ export default function ApiKeyDialog({
                     setDropdownOpen((prev) => ({ ...prev, reranker: open }))
                   }
                   dropdownKey="reranker"
+                />
+              )}
+
+              {/* Reranker Model — preference, shown even when reranker auth is system-defined */}
+              {rerankerModels.length > 0 && (
+                <RerankerModelSection
+                  models={rerankerModels}
+                  register={register}
+                  setValue={setValue}
                 />
               )}
             </form>

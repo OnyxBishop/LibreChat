@@ -17,6 +17,8 @@ export type SearchApiKeyFormData = {
   jinaApiKey: string;
   jinaApiUrl: string;
   cohereApiKey: string;
+  // Reranker model choice (not a credential — carried to the sidecar via ?model=)
+  rerankerModel: string;
 };
 
 const useAuthSearchTool = (options?: { isEntityTool: boolean }) => {
@@ -57,6 +59,7 @@ const useAuthSearchTool = (options?: { isEntityTool: boolean }) => {
         jinaApiKey: data.jinaApiKey,
         jinaApiUrl: data.jinaApiUrl,
         cohereApiKey: data.cohereApiKey,
+        rerankerModel: data.rerankerModel,
       }).reduce(
         (acc, [key, value]) => {
           if (value) {

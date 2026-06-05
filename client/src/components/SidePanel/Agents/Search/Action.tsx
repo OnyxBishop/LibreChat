@@ -127,6 +127,7 @@ export default function Action({
         onRevoke={handleRevokeApiKey}
         onOpenChange={setIsDialogOpen}
         register={keyFormMethods.register}
+        setValue={keyFormMethods.setValue}
         isToolAuthenticated={isToolAuthenticated}
         handleSubmit={keyFormMethods.handleSubmit}
         triggerRef={apiKeyButtonRef}

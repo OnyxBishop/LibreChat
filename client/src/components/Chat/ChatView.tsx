@@ -16,7 +16,6 @@ import ChatForm from './Input/ChatForm';
 import Landing from './Landing';
 import Header from './Header';
 import Footer from './Footer';
-import TranscriptionWindow from './Transcription/TranscriptionWindow';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -84,7 +83,6 @@ function ChatView({ index = 0 }: { index?: number }) {
           <Presentation>
             <div className="relative flex h-full w-full flex-col">
               <Header />
-              <TranscriptionWindow />
               <>
                 <div
                   className={cn(

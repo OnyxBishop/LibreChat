@@ -41,6 +41,8 @@ export * from './prompts';
 export * from './endpoints';
 /* Files */
 export * from './files';
+/* Conference assistant */
+export * from './conference';
 /* Storage */
 export * from './storage';
 /* Tools */

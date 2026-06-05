@@ -14,6 +14,8 @@ export interface STTService {
       language?: string;
       /** User-selected STT model, validated against the admin allowlist. */
       model?: string;
+      /** Optional transcription prompt to bias recognition (e.g. domain terms). */
+      prompt?: string;
     },
   ): Promise<string>;
 }

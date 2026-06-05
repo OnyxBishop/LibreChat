@@ -73,16 +73,6 @@ const localStorageAtoms = {
   playbackRate: atomWithLocalStorage<number | null>('playbackRate', null),
   cacheTTS: atomWithLocalStorage('cacheTTS', true),
 
-  // Transcription window state
-  showTranscriptionWindow: atomWithLocalStorage('showTranscriptionWindow', false),
-  vadMode: atomWithLocalStorage('vadMode', 'push-to-talk'),
-  transcriptionHistory: atom<
-    Array<{ id: string; speaker: string; text: string; timestamp: string }>
-  >({
-    key: 'transcriptionHistory',
-    default: [],
-  }),
-
   // Account settings
   UsernameDisplay: atomWithLocalStorage('UsernameDisplay', true),
 };

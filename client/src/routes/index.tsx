@@ -117,6 +117,11 @@ export const router = createBrowserRouter(
               element: <Search />,
             },
             {
+              path: 'conference',
+              lazy: () =>
+                import('~/components/Conference').then((m) => ({ Component: m.default })),
+            },
+            {
               path: 'prompts',
               element: <Navigate to="/prompts/new" replace={true} />,
             },

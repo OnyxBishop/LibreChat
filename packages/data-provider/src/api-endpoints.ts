@@ -294,7 +294,6 @@ export const avatar = () => `${images()}/avatar`;
 export const speech = () => `${files()}/speech`;
 
 export const speechToText = () => `${speech()}/stt`;
-export const speechToTextStream = () => `${speech()}/stt-stream`;
 
 export const textToSpeech = () => `${speech()}/tts`;
 

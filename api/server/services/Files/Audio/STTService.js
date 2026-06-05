@@ -209,9 +209,10 @@ class STTService {
    * @param {Object} audioFile - The audio file object (unused in OpenAI provider).
    * @param {string} language - The language code for the transcription.
    * @param {string} [model] - The user-requested STT model (validated against the allowlist).
+   * @param {string} [prompt] - Optional transcription prompt to bias recognition (e.g. domain terms).
    * @returns {Array} An array containing the URL, data, and headers for the request.
    */
-  openAIProvider(sttSchema, audioReadStream, audioFile, language, model) {
+  openAIProvider(sttSchema, audioReadStream, audioFile, language, model, prompt) {
     const url = sttSchema?.url || 'https://api.openai.com/v1/audio/transcriptions';
     const apiKey = extractEnvVariable(sttSchema.apiKey) || '';
 
@@ -223,6 +224,10 @@ class STTService {
     const validLanguage = getValidatedLanguageCode(language);
     if (validLanguage) {
       data.language = validLanguage;
+    }
+
+    if (typeof prompt === 'string' && prompt.trim()) {
+      data.prompt = prompt.trim();
     }
 
     const headers = {
@@ -241,10 +246,11 @@ class STTService {
    * @param {Object} audioFile - The audio file object containing originalname, mimetype, and size.
    * @param {string} language - The language code for the transcription.
    * @param {string} [_model] - The user-requested STT model (ignored for Azure; the deployment dictates the model).
+   * @param {string} [_prompt] - Optional transcription prompt (not forwarded for Azure).
    * @returns {Array} An array containing the URL, data, and headers for the request.
    * @throws {Error} If the audio file size exceeds 25MB or the audio file format is not accepted.
    */
-  azureOpenAIProvider(sttSchema, audioBuffer, audioFile, language, _model) {
+  azureOpenAIProvider(sttSchema, audioBuffer, audioFile, language, _model, _prompt) {
     const url = `${genAzureEndpoint({
       azureOpenAIApiInstanceName: extractEnvVariable(sttSchema?.instanceName),
       azureOpenAIApiDeploymentName: extractEnvVariable(sttSchema?.deploymentName),
@@ -292,10 +298,11 @@ class STTService {
    * @param {Object} requestData.audioFile - The audio file object containing originalname, mimetype, and size.
    * @param {string} requestData.language - The language code for the transcription.
    * @param {string} [requestData.model] - The user-requested STT model (validated against the allowlist).
+   * @param {string} [requestData.prompt] - Optional transcription prompt to bias recognition.
    * @returns {Promise<string>} A promise that resolves to the transcribed text.
    * @throws {Error} If the provider is invalid, the response status is not 200, or the response data is missing.
    */
-  async sttRequest(provider, sttSchema, { audioBuffer, audioFile, language, model }) {
+  async sttRequest(provider, sttSchema, { audioBuffer, audioFile, language, model, prompt }) {
     const strategy = this.providerStrategies[provider];
     if (!strategy) {
       throw new Error('Invalid provider');
@@ -313,6 +320,7 @@ class STTService {
       audioFile,
       language,
       model,
+      prompt,
     );
 
     const options = { headers };
@@ -362,11 +370,13 @@ class STTService {
       const [provider, sttSchema] = await this.getProviderSchema(req);
       const language = req.body?.language || '';
       const model = req.body?.model || '';
+      const prompt = req.body?.prompt || '';
       const text = await this.sttRequest(provider, sttSchema, {
         audioBuffer,
         audioFile,
         language,
         model,
+        prompt,
       });
       res.json({ text });
     } catch (error) {

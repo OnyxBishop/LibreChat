@@ -1215,6 +1215,7 @@ engines:
     categories: [general, web]
     search_type: web
     shortcut: ka
+    disabled: true
 
   - name: karmasearch images
     engine: karmasearch
@@ -1222,18 +1223,21 @@ engines:
     search_type: images
     shortcut: kai
     paging: false
+    disabled: true
 
   - name: karmasearch videos
     engine: karmasearch
     categories: [general, web]
     search_type: videos
     shortcut: kav
+    disabled: true
 
   - name: karmasearch news
     engine: karmasearch
     categories: [news, web]
     search_type: news
     shortcut: kan
+    disabled: true
 
   - name: kickass
     engine: kickass
@@ -2004,18 +2008,21 @@ engines:
     shortcut: sp
     startpage_categ: web
     categories: [general, web]
+    disabled: true
 
   - name: startpage news
     engine: startpage
     startpage_categ: news
     categories: [news, web]
     shortcut: spn
+    disabled: true
 
   - name: startpage images
     engine: startpage
     startpage_categ: images
     categories: [images, web]
     shortcut: spi
+    disabled: true
 
   - name: steam
     engine: steam
@@ -2161,6 +2168,7 @@ engines:
   - name: yahoo news
     engine: yahoo_news
     shortcut: yhn
+    disabled: true
 
   - name: youtube
     shortcut: yt
@@ -2608,6 +2616,7 @@ engines:
     categories: [general, web]
     brave_category: search
     # brave_spellcheck: true
+    disabled: true
 
   - name: brave.images
     engine: brave
@@ -2615,6 +2624,7 @@ engines:
     shortcut: brimg
     categories: [images, web]
     brave_category: images
+    disabled: true
 
   - name: brave.videos
     engine: brave
@@ -2622,6 +2632,7 @@ engines:
     shortcut: brvid
     categories: [videos, web]
     brave_category: videos
+    disabled: true
 
   - name: brave.news
     engine: brave
@@ -2629,6 +2640,7 @@ engines:
     shortcut: brnews
     categories: news
     brave_category: news
+    disabled: true
 
   # - name: brave.goggles
   #   engine: brave

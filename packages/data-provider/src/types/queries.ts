@@ -168,6 +168,14 @@ export type TUpdateSkill = Partial<TCreateSkill>;
 
 export type TSkillsResponse = TSkill[];
 
+export type TSkillFile = {
+  name: string;
+  size: number;
+  updatedAt: string;
+};
+
+export type TSkillFilesResponse = TSkillFile[];
+
 export type PrincipalSearchParams = {
   q: string;
   limit?: number;

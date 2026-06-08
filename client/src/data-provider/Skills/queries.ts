@@ -2,7 +2,13 @@
 import { QueryKeys, dataService } from 'librechat-data-provider';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import type { UseQueryOptions, UseMutationOptions, QueryObserverResult } from '@tanstack/react-query';
-import type { TSkill, TCreateSkill, TUpdateSkill, TSkillsResponse } from 'librechat-data-provider';
+import type {
+  TSkill,
+  TCreateSkill,
+  TUpdateSkill,
+  TSkillsResponse,
+  TSkillFilesResponse,
+} from 'librechat-data-provider';
 
 export const useGetSkillsQuery = (
   config?: UseQueryOptions<TSkillsResponse>,
@@ -56,4 +62,66 @@ export const useDeleteSkillMutation = (
       options?.onSuccess?.(...params);
     },
   });
+};
+
+export const useImportSkillMutation = (options?: UseMutationOptions<TSkill, Error, FormData>) => {
+  const queryClient = useQueryClient();
+  return useMutation<TSkill, Error, FormData>((formData) => dataService.importSkill(formData), {
+    ...options,
+    onSuccess: (...params) => {
+      queryClient.invalidateQueries([QueryKeys.skills]);
+      options?.onSuccess?.(...params);
+    },
+  });
+};
+
+/* Skill bundle files */
+export const useGetSkillFilesQuery = (
+  id: string,
+  config?: UseQueryOptions<TSkillFilesResponse>,
+): QueryObserverResult<TSkillFilesResponse> => {
+  return useQuery<TSkillFilesResponse>(
+    [QueryKeys.skills, id, 'files'],
+    () => dataService.getSkillFiles(id),
+    {
+      enabled: !!id,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      ...config,
+    },
+  );
+};
+
+export type UploadSkillFileParams = { id: string; formData: FormData };
+export const useUploadSkillFileMutation = (
+  options?: UseMutationOptions<TSkillFilesResponse, Error, UploadSkillFileParams>,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation<TSkillFilesResponse, Error, UploadSkillFileParams>(
+    ({ id, formData }) => dataService.uploadSkillFile(id, formData),
+    {
+      ...options,
+      onSuccess: (data, variables, context) => {
+        queryClient.setQueryData([QueryKeys.skills, variables.id, 'files'], data);
+        options?.onSuccess?.(data, variables, context);
+      },
+    },
+  );
+};
+
+export type DeleteSkillFileParams = { id: string; name: string };
+export const useDeleteSkillFileMutation = (
+  options?: UseMutationOptions<TSkillFilesResponse, Error, DeleteSkillFileParams>,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation<TSkillFilesResponse, Error, DeleteSkillFileParams>(
+    ({ id, name }) => dataService.deleteSkillFile(id, name),
+    {
+      ...options,
+      onSuccess: (data, variables, context) => {
+        queryClient.setQueryData([QueryKeys.skills, variables.id, 'files'], data);
+        options?.onSuccess?.(data, variables, context);
+      },
+    },
+  );
 };

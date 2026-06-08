@@ -30,6 +30,7 @@ services:
       - ./images:/app/client/public/images
       - ./uploads:/app/uploads
       - ./logs:/app/api/logs
+      - ./skills:/app/skills
 
   client:
     image: nginx:1.27.0-alpine
@@ -101,6 +102,25 @@ services:
       - PORT=8787
       - AITUNNEL_BASE_URL=https://api.aitunnel.ru/v1
       - RERANK_MODEL=rerank-4-fast
+  # Self-hosted MCP runtime that executes skill-bundle scripts in isolation.
+  # Intentionally NOT using env_file (.env) so other services' secrets never
+  # reach the sandbox; only the auth token is injected.
+  skills-mcp:
+    build:
+      context: ./skills-mcp
+    container_name: skills-mcp
+    restart: always
+    environment:
+      - PORT=8790
+      - SKILLS_DIR=/app/skills
+      - SKILLS_MCP_TOKEN=${SKILLS_MCP_TOKEN}
+    volumes:
+      - ./skills:/app/skills:ro
+    tmpfs:
+      - /tmp
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
 
 volumes:
   pgdata2:

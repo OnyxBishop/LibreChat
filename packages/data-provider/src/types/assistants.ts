@@ -26,6 +26,7 @@ export enum Tools {
   ui_resources = 'ui_resources',
   load_skill = 'load_skill',
   save_skill = 'save_skill',
+  read_skill_file = 'read_skill_file',
 }
 
 export enum EToolResources {

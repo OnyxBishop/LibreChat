@@ -48,6 +48,11 @@ const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools } = require('~/server/services/Config');
 const { getMCPServersRegistry } = require('~/config');
 const { getRoleByName, getSkillByName, upsertSkillByName } = require('~/models');
+const {
+  materializeSkill,
+  listSkillFiles,
+  readSkillFile,
+} = require('~/server/services/Files/Skills/materialize');
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -342,52 +347,98 @@ const loadTools = async ({
         });
       };
       continue;
-    } else if (tool === Tools.load_skill || tool === Tools.save_skill) {
-      const isLoadSkill = tool === Tools.load_skill;
+    } else if (tool === Tools.load_skill) {
       requestedTools[tool] = async () =>
         createTool(
           async (input) => {
             try {
-              if (isLoadSkill) {
-                const skill = await getSkillByName({ author: user, name: input?.name });
-                if (!skill) {
-                  return `No skill named "${input?.name}" was found.`;
-                }
-                return skill.content || `Skill "${skill.name}" has no content.`;
+              const skill = await getSkillByName({ author: user, name: input?.name });
+              if (!skill) {
+                return `No skill named "${input?.name}" was found.`;
               }
+              let out = skill.content || `Skill "${skill.name}" has no content.`;
+              const files = await listSkillFiles(user, String(skill._id));
+              if (files.length) {
+                out +=
+                  '\n\n---\nBundled files (use `read_skill_file` to read text, `run_skill_script` to execute):\n' +
+                  files.map((f) => `- ${f.name} (${f.size} bytes)`).join('\n');
+              }
+              return out;
+            } catch (error) {
+              logger.error('[handleTools] load_skill error:', error);
+              return 'Failed to load the skill.';
+            }
+          },
+          {
+            name: Tools.load_skill,
+            description:
+              "Load the full instructions of one of the user's available skills by name, plus the list of files bundled with it.",
+            schema: z.object({
+              name: z.string().describe('The exact skill name to load.'),
+            }),
+          },
+        );
+      continue;
+    } else if (tool === Tools.read_skill_file) {
+      requestedTools[tool] = async () =>
+        createTool(
+          async (input) => {
+            try {
+              const skill = await getSkillByName({ author: user, name: input?.name });
+              if (!skill) {
+                return `No skill named "${input?.name}" was found.`;
+              }
+              const content = await readSkillFile(user, String(skill._id), input?.path);
+              if (content == null) {
+                return `File "${input?.path}" was not found in skill "${input?.name}".`;
+              }
+              return content;
+            } catch (error) {
+              logger.error('[handleTools] read_skill_file error:', error);
+              return 'Failed to read the skill file.';
+            }
+          },
+          {
+            name: Tools.read_skill_file,
+            description:
+              "Read the text contents of a file bundled with one of the user's skills (e.g. a reference doc or script).",
+            schema: z.object({
+              name: z.string().describe('The exact skill name.'),
+              path: z.string().describe('Relative path of the file within the skill bundle.'),
+            }),
+          },
+        );
+      continue;
+    } else if (tool === Tools.save_skill) {
+      requestedTools[tool] = async () =>
+        createTool(
+          async (input) => {
+            try {
               const saved = await upsertSkillByName(user, {
                 name: input?.name,
                 description: input?.description ?? '',
                 content: input?.content ?? '',
               });
+              await materializeSkill(user, saved);
               return `Saved skill "${saved.name}".`;
             } catch (error) {
-              logger.error(`[handleTools] ${isLoadSkill ? 'load_skill' : 'save_skill'} error:`, error);
-              return `Failed to ${isLoadSkill ? 'load' : 'save'} the skill.`;
+              logger.error('[handleTools] save_skill error:', error);
+              return 'Failed to save the skill.';
             }
           },
-          isLoadSkill
-            ? {
-                name: Tools.load_skill,
-                description:
-                  "Load the full instructions of one of the user's available skills by name.",
-                schema: z.object({
-                  name: z.string().describe('The exact skill name to load.'),
-                }),
-              }
-            : {
-                name: Tools.save_skill,
-                description:
-                  "Save a reusable skill to the user's skill library. Use only when the user asks to create or save a skill.",
-                schema: z.object({
-                  name: z.string().describe('Short kebab-case skill name.'),
-                  description: z
-                    .string()
-                    .optional()
-                    .describe('One-line description of when to use this skill.'),
-                  content: z.string().describe('Full skill body in Markdown.'),
-                }),
-              },
+          {
+            name: Tools.save_skill,
+            description:
+              "Save a reusable skill to the user's skill library. Use only when the user asks to create or save a skill.",
+            schema: z.object({
+              name: z.string().describe('Short kebab-case skill name.'),
+              description: z
+                .string()
+                .optional()
+                .describe('One-line description of when to use this skill.'),
+              content: z.string().describe('Full skill body in Markdown.'),
+            }),
+          },
         );
       continue;
     } else if (tool && mcpToolPattern.test(tool)) {

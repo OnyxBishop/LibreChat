@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Upload, Download } from 'lucide-react';
+import { ArrowLeft, Upload, Download, Paperclip, X, Archive } from 'lucide-react';
 import { Trans } from 'react-i18next';
 import {
   Label,
@@ -12,11 +12,15 @@ import {
   OGDialogTemplate,
   useToastContext,
 } from '@librechat/client';
+import { dataService } from 'librechat-data-provider';
 import type { TSkill } from 'librechat-data-provider';
 import {
   useCreateSkillMutation,
   useUpdateSkillMutation,
   useDeleteSkillMutation,
+  useGetSkillFilesQuery,
+  useUploadSkillFileMutation,
+  useDeleteSkillFileMutation,
 } from '~/data-provider';
 import { parseSkillMarkdown, buildSkillMarkdown } from '~/utils/skills';
 import { useLocalize } from '~/hooks';
@@ -35,6 +39,11 @@ description: When to use this skill (the model reads this to decide relevance)
 # My Skill
 
 Step-by-step instructions the AI should follow when this skill is loaded.
+
+## Bundled files (optional)
+Attach scripts or reference files below, then tell the AI how to use them:
+- Read a reference with the \`read_skill_file\` tool, e.g. read \`reference.md\`.
+- Run a script with the \`run_skill_script\` tool, e.g. run \`fetch.sh\` with args.
 `;
 
 export default function SkillEditor({ skill, onBack }: SkillEditorProps) {
@@ -78,6 +87,39 @@ export default function SkillEditor({ skill, onBack }: SkillEditorProps) {
 
   const isSaving = createSkill.isLoading || updateSkill.isLoading;
 
+  const bundleInputRef = useRef<HTMLInputElement>(null);
+  const skillFilesQuery = useGetSkillFilesQuery(skill?._id ?? '', { enabled: !!skill });
+  const uploadFile = useUploadSkillFileMutation({
+    onError: () => showToast({ message: localize('com_ui_error'), status: 'error' }),
+  });
+  const deleteFile = useDeleteSkillFileMutation({
+    onError: () => showToast({ message: localize('com_ui_error'), status: 'error' }),
+  });
+  const bundleFiles = skillFilesQuery.data ?? [];
+
+  const handleBundleUploadClick = () => bundleInputRef.current?.click();
+
+  const handleBundleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !skill) {
+      return;
+    }
+    const formData = new FormData();
+    formData.append('file', file, encodeURIComponent(file.name));
+    uploadFile.mutate({ id: skill._id, formData });
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const handleSave = () => {
     const parsed = parseSkillMarkdown(text);
     if (!parsed.name) {
@@ -118,10 +160,7 @@ export default function SkillEditor({ skill, onBack }: SkillEditorProps) {
     reader.readAsText(file);
   };
 
-  const handleExport = () => {
-    const parsed = parseSkillMarkdown(text);
-    const fileName = `${parsed.name || 'skill'}.md`;
-    const blob = new Blob([text], { type: 'text/markdown' });
+  const triggerDownload = (blob: Blob, fileName: string) => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -130,6 +169,24 @@ export default function SkillEditor({ skill, onBack }: SkillEditorProps) {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  };
+
+  const handleExport = () => {
+    const parsed = parseSkillMarkdown(text);
+    triggerDownload(new Blob([text], { type: 'text/markdown' }), `${parsed.name || 'skill'}.md`);
+  };
+
+  const handleExportZip = async () => {
+    if (!skill) {
+      return;
+    }
+    try {
+      const response = await dataService.exportSkill(skill._id);
+      const fileName = `${parseSkillMarkdown(text).name || skill.name || 'skill'}.zip`;
+      triggerDownload(new Blob([response.data], { type: 'application/zip' }), fileName);
+    } catch {
+      showToast({ message: localize('com_ui_error'), status: 'error' });
+    }
   };
 
   return (
@@ -184,6 +241,23 @@ export default function SkillEditor({ skill, onBack }: SkillEditorProps) {
             </Button>
           }
         />
+        {skill && (
+          <TooltipAnchor
+            description={localize('com_ui_skill_export_zip')}
+            side="bottom"
+            render={
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-9 shrink-0 bg-transparent"
+                aria-label={localize('com_ui_skill_export_zip')}
+                onClick={handleExportZip}
+              >
+                <Archive className="size-4" aria-hidden="true" />
+              </Button>
+            }
+          />
+        )}
       </div>
 
       <input
@@ -211,6 +285,69 @@ export default function SkillEditor({ skill, onBack }: SkillEditorProps) {
           )}
         />
       </div>
+
+      {/* Bundle files (only for an existing skill) */}
+      {skill && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium text-text-primary">
+              {localize('com_ui_skill_files')}
+            </Label>
+            <TooltipAnchor
+              description={localize('com_ui_skill_file_add')}
+              side="bottom"
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-8 shrink-0 bg-transparent"
+                  aria-label={localize('com_ui_skill_file_add')}
+                  onClick={handleBundleUploadClick}
+                  disabled={uploadFile.isLoading}
+                >
+                  {uploadFile.isLoading ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <Paperclip className="size-4" aria-hidden="true" />
+                  )}
+                </Button>
+              }
+            />
+          </div>
+          <input
+            ref={bundleInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleBundleFile}
+          />
+          {bundleFiles.length === 0 ? (
+            <p className="text-xs text-text-secondary">{localize('com_ui_skill_files_empty')}</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {bundleFiles.map((file) => (
+                <li
+                  key={file.name}
+                  className="flex items-center gap-2 rounded-md border border-border-light px-2 py-1 text-xs"
+                >
+                  <span className="flex-1 truncate font-mono text-text-primary" title={file.name}>
+                    {file.name}
+                  </span>
+                  <span className="shrink-0 text-text-secondary">{formatBytes(file.size)}</span>
+                  <button
+                    type="button"
+                    aria-label={localize('com_ui_delete')}
+                    className="shrink-0 text-text-secondary hover:text-text-primary"
+                    onClick={() => deleteFile.mutate({ id: skill._id, name: file.name })}
+                    disabled={deleteFile.isLoading}
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Footer actions */}
       <div className="flex items-center justify-between gap-2">

@@ -121,6 +121,9 @@ auth.json
 # User uploads
 uploads/
 
+# Skill bundles (materialized per-user on the shared volume; source is skills-mcp/)
+/skills/
+
 # owner
 release/
 

@@ -302,7 +302,17 @@ export async function initializeAgent(
    * model without the user having to add them to each agent.
    */
   const toolsWithSkills = Array.from(
-    new Set([...(agent.tools ?? []), Tools.load_skill, Tools.save_skill]),
+    new Set([
+      ...(agent.tools ?? []),
+      Tools.load_skill,
+      Tools.save_skill,
+      Tools.read_skill_file,
+      /**
+       * Pull in all tools of the self-hosted "skills" MCP runtime (run_skill_script).
+       * If the MCP server is not configured, loadTools logs a warning and skips it.
+       */
+      `${Constants.mcp_all}${Constants.mcp_delimiter}skills`,
+    ]),
   );
 
   const {

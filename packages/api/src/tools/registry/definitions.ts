@@ -389,6 +389,24 @@ export const saveSkillSchema: ExtendedJsonSchema = {
   required: ['name', 'content'],
 };
 
+/** read_skill_file tool JSON schema */
+export const readSkillFileSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    name: {
+      type: 'string',
+      minLength: 1,
+      description: 'The exact name of the skill, as listed under \'# Available Skills\'.',
+    },
+    path: {
+      type: 'string',
+      minLength: 1,
+      description: 'Relative path of the file within the skill bundle (e.g. "reference.md").',
+    },
+  },
+  required: ['name', 'path'],
+};
+
 /** Tool definitions registry - maps tool names to their definitions */
 export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
   load_skill: {
@@ -403,6 +421,13 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     description:
       'Save a reusable skill to the user\'s skill library. Only call this when the user explicitly asks to create, build, or save a skill.',
     schema: saveSkillSchema,
+    toolType: 'builtin',
+  },
+  read_skill_file: {
+    name: 'read_skill_file',
+    description:
+      "Read the text contents of a file bundled with one of the user's skills (e.g. a reference doc or script). Use after load_skill lists the skill's bundled files.",
+    schema: readSkillFileSchema,
     toolType: 'builtin',
   },
   google: {

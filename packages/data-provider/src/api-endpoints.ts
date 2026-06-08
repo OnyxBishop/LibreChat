@@ -411,6 +411,11 @@ export const memoryPreferences = () => `${memories()}/preferences`;
 /* Skills */
 export const skills = () => `${BASE_URL}/api/skills`;
 export const skill = (id: string) => `${skills()}/${id}`;
+export const skillFiles = (id: string) => `${skill(id)}/files`;
+export const skillFile = (id: string, name: string) =>
+  `${skillFiles(id)}?name=${encodeURIComponent(name)}`;
+export const skillExport = (id: string) => `${skill(id)}/export`;
+export const skillImport = () => `${skills()}/import`;
 
 export const searchPrincipals = (params: q.PrincipalSearchParams) => {
   const { q: query, limit, types } = params;

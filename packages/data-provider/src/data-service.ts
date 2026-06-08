@@ -1047,6 +1047,29 @@ export const deleteSkill = (id: string): Promise<{ message: string }> => {
   return request.delete(endpoints.skill(id));
 };
 
+export const getSkillFiles = (id: string): Promise<q.TSkillFilesResponse> => {
+  return request.get(endpoints.skillFiles(id));
+};
+
+export const uploadSkillFile = (id: string, formData: FormData): Promise<q.TSkillFilesResponse> => {
+  return request.postMultiPart(endpoints.skillFiles(id), formData);
+};
+
+export const deleteSkillFile = (id: string, name: string): Promise<q.TSkillFilesResponse> => {
+  return request.delete(endpoints.skillFile(id, name));
+};
+
+export const exportSkill = (id: string): Promise<AxiosResponse> => {
+  return request.getResponse(endpoints.skillExport(id), {
+    responseType: 'blob',
+    headers: { Accept: 'application/zip' },
+  });
+};
+
+export const importSkill = (formData: FormData): Promise<q.TSkill> => {
+  return request.postMultiPart(endpoints.skillImport(), formData);
+};
+
 export function searchPrincipals(
   params: q.PrincipalSearchParams,
 ): Promise<q.PrincipalSearchResponse> {

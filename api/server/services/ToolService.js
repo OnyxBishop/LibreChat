@@ -502,10 +502,11 @@ const nativeTools = new Set([
   Tools.web_search,
   Tools.load_skill,
   Tools.save_skill,
+  Tools.read_skill_file,
 ]);
 
 /** Always-on skill tools that bypass the generic `tools` capability gate */
-const skillTools = new Set([Tools.load_skill, Tools.save_skill]);
+const skillTools = new Set([Tools.load_skill, Tools.save_skill, Tools.read_skill_file]);
 
 /** Checks if a tool name is a known built-in tool */
 const isBuiltInTool = (toolName) =>

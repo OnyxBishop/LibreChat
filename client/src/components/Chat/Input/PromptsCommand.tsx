@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useMemo, memo, useCallback } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
 import { Spinner, useCombobox } from '@librechat/client';
 import { useSetRecoilState, useRecoilValue } from 'recoil';
-import type { TPromptGroup } from 'librechat-data-provider';
+import type { TPromptGroup, TSkill } from 'librechat-data-provider';
 import type { PromptOption } from '~/common';
 import { removeCharIfLast, detectVariables } from '~/utils';
-import { useRecordPromptUsage } from '~/data-provider';
+import { buildSkillMarkdown } from '~/utils/skills';
+import { useRecordPromptUsage, useGetSkillsQuery } from '~/data-provider';
 import { VariableDialog } from '~/components/Prompts';
 import { usePromptGroupsContext } from '~/Providers';
 import MentionItem from './MentionItem';
@@ -76,9 +77,36 @@ function PromptsCommand({
   const prompts = useMemo(() => data?.promptGroups, [data]);
   const promptsMap = useMemo(() => data?.promptsMap, [data]);
 
+  const { data: skills } = useGetSkillsQuery();
+
+  const skillOptions = useMemo<PromptOption[]>(
+    () =>
+      (skills ?? []).map((skill) => ({
+        id: `skill:${skill._id}`,
+        type: 'skill',
+        value: skill.name,
+        label: skill.name,
+        description: skill.description,
+      })),
+    [skills],
+  );
+
+  const skillsById = useMemo(() => {
+    const map: Record<string, TSkill> = {};
+    (skills ?? []).forEach((skill) => {
+      map[`skill:${skill._id}`] = skill;
+    });
+    return map;
+  }, [skills]);
+
+  const comboOptions = useMemo(
+    () => [...(prompts ?? []), ...skillOptions],
+    [prompts, skillOptions],
+  );
+
   const { open, setOpen, searchValue, setSearchValue, matches } = useCombobox({
     value: '',
-    options: prompts ?? [],
+    options: comboOptions,
   });
 
   const handleSelect = useCallback(
@@ -93,6 +121,14 @@ function PromptsCommand({
 
       if (textAreaRef.current) {
         removeCharIfLast(textAreaRef.current, commandChar);
+      }
+
+      if (mention.id?.startsWith('skill:')) {
+        const skill = skillsById[mention.id];
+        if (skill) {
+          submitPrompt(skill.content || buildSkillMarkdown(skill));
+        }
+        return;
       }
 
       const group = promptsMap?.[mention.id];
@@ -121,6 +157,7 @@ function PromptsCommand({
       setShowPromptsPopover,
       textAreaRef,
       promptsMap,
+      skillsById,
       submitPrompt,
       recordUsage,
     ],

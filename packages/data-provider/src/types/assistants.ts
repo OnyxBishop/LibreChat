@@ -24,6 +24,8 @@ export enum Tools {
   function = 'function',
   memory = 'memory',
   ui_resources = 'ui_resources',
+  load_skill = 'load_skill',
+  save_skill = 'save_skill',
 }
 
 export enum EToolResources {

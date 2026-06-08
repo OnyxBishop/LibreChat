@@ -1,5 +1,6 @@
 import { Providers } from '@librechat/agents';
 import {
+  Tools,
   Constants,
   ErrorTypes,
   EModelEndpoint,
@@ -295,6 +296,15 @@ export async function initializeAgent(
     requestFileSet: new Set(requestFiles?.map((file) => file.file_id)),
   });
 
+  /**
+   * Always-on skill tools: every agent run can load/save the user's skills on demand.
+   * Appended at load time only (agent.tools is not mutated), so they are offered to the
+   * model without the user having to add them to each agent.
+   */
+  const toolsWithSkills = Array.from(
+    new Set([...(agent.tools ?? []), Tools.load_skill, Tools.save_skill]),
+  );
+
   const {
     toolRegistry,
     toolContextMap,
@@ -308,7 +318,7 @@ export async function initializeAgent(
     res,
     provider,
     agentId: agent.id,
-    tools: agent.tools ?? [],
+    tools: toolsWithSkills,
     model: agent.model,
     tool_options: agent.tool_options,
     tool_resources,

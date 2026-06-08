@@ -354,8 +354,57 @@ export const fileSearchSchema: ExtendedJsonSchema = {
   required: ['query'],
 };
 
+/** load_skill tool JSON schema */
+export const loadSkillSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    name: {
+      type: 'string',
+      minLength: 1,
+      description: "The exact name of the skill to load, as listed under '# Available Skills'.",
+    },
+  },
+  required: ['name'],
+};
+
+/** save_skill tool JSON schema */
+export const saveSkillSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    name: {
+      type: 'string',
+      minLength: 1,
+      description: 'A short kebab-case name for the skill (e.g. "pdf-fill").',
+    },
+    description: {
+      type: 'string',
+      description: 'A one-line description of when this skill should be used.',
+    },
+    content: {
+      type: 'string',
+      minLength: 1,
+      description: 'The full skill body in Markdown: step-by-step instructions for the task.',
+    },
+  },
+  required: ['name', 'content'],
+};
+
 /** Tool definitions registry - maps tool names to their definitions */
 export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
+  load_skill: {
+    name: 'load_skill',
+    description:
+      "Load the full instructions of one of the user's available skills by name. Call this when the user's task matches a skill listed under '# Available Skills' before responding.",
+    schema: loadSkillSchema,
+    toolType: 'builtin',
+  },
+  save_skill: {
+    name: 'save_skill',
+    description:
+      'Save a reusable skill to the user\'s skill library. Only call this when the user explicitly asks to create, build, or save a skill.',
+    schema: saveSkillSchema,
+    toolType: 'builtin',
+  },
   google: {
     name: 'google',
     description:

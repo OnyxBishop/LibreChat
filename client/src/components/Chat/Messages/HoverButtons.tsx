@@ -1,8 +1,18 @@
 import React, { useState, useMemo, memo } from 'react';
 import { useRecoilState } from 'recoil';
+import { Sparkles } from 'lucide-react';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
-import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
+import {
+  EditIcon,
+  Clipboard,
+  CheckMark,
+  ContinueIcon,
+  RegenerateIcon,
+  useToastContext,
+} from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
+import { useCreateSkillMutation } from '~/data-provider';
+import { parseSkillMarkdown, extractSkillBlock } from '~/utils/skills';
 import { Fork } from '~/components/Conversations';
 import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
@@ -124,8 +134,44 @@ const HoverButtons = ({
   handleFeedback,
 }: THoverButtons) => {
   const localize = useLocalize();
+  const { showToast } = useToastContext();
   const [isCopied, setIsCopied] = useState(false);
   const [TextToSpeech] = useRecoilState<boolean>(store.textToSpeech);
+
+  const skillBlock = useMemo(() => {
+    if (message.isCreatedByUser) {
+      return null;
+    }
+    return extractSkillBlock(extractMessageContent(message));
+  }, [message]);
+
+  const createSkill = useCreateSkillMutation({
+    onSuccess: () => showToast({ message: localize('com_ui_skill_saved'), status: 'success' }),
+    onError: (error: unknown) => {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      showToast({
+        message:
+          status === 409 ? localize('com_ui_skill_exists') : localize('com_ui_error'),
+        status: 'error',
+      });
+    },
+  });
+
+  const handleSaveAsSkill = () => {
+    if (!skillBlock) {
+      return;
+    }
+    const parsed = parseSkillMarkdown(skillBlock);
+    if (!parsed.name) {
+      showToast({ message: localize('com_ui_skill_name_required'), status: 'error' });
+      return;
+    }
+    createSkill.mutate({
+      name: parsed.name,
+      description: parsed.description,
+      content: parsed.content,
+    });
+  };
 
   const endpoint = useMemo(() => {
     if (!conversation) {
@@ -218,6 +264,17 @@ const HoverButtons = ({
           isSubmitting && isCreatedByUser ? 'md:opacity-0 md:group-hover:opacity-100' : '',
         )}
       />
+
+      {/* Save as Skill Button */}
+      {skillBlock != null && (
+        <HoverButton
+          onClick={handleSaveAsSkill}
+          title={localize('com_ui_save_as_skill')}
+          icon={<Sparkles size="18" />}
+          isLast={isLast}
+          isDisabled={createSkill.isLoading}
+        />
+      )}
 
       {/* Edit Button */}
       {isEditableEndpoint && (

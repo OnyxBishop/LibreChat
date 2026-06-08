@@ -1030,6 +1030,23 @@ export const createMemory = (data: {
   return request.post(endpoints.memories(), data);
 };
 
+/* Skills */
+export const getSkills = (): Promise<q.TSkillsResponse> => {
+  return request.get(endpoints.skills());
+};
+
+export const createSkill = (data: q.TCreateSkill): Promise<q.TSkill> => {
+  return request.post(endpoints.skills(), data);
+};
+
+export const updateSkill = (id: string, data: q.TUpdateSkill): Promise<q.TSkill> => {
+  return request.patch(endpoints.skill(id), data);
+};
+
+export const deleteSkill = (id: string): Promise<{ message: string }> => {
+  return request.delete(endpoints.skill(id));
+};
+
 export function searchPrincipals(
   params: q.PrincipalSearchParams,
 ): Promise<q.PrincipalSearchResponse> {

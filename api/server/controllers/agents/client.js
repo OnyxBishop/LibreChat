@@ -346,6 +346,27 @@ class AgentClient extends BaseClient {
       sharedRunContextParts.push(memoryContext);
     }
 
+    /** Skills: make the model aware of the user's enabled skills (compact index) */
+    try {
+      const skillsUserId = this.options.req?.user?.id;
+      if (skillsUserId) {
+        const skillsIndex = await db.getEnabledSkillsIndex(skillsUserId);
+        if (skillsIndex?.length) {
+          const indexLines = skillsIndex
+            .map((entry) => `- ${entry.name}: ${entry.description || ''}`.trimEnd())
+            .join('\n');
+          sharedRunContextParts.push(
+            '# Available Skills\n' +
+              "The following skills are available. When the user's task matches a skill, call the " +
+              '`load_skill` tool with that skill\'s name to load its full instructions before responding.\n\n' +
+              indexLines,
+          );
+        }
+      }
+    } catch (error) {
+      logger.error('[AgentClient] Failed to inject skills index', error);
+    }
+
     const sharedRunContext = sharedRunContextParts.join('\n\n');
 
     /** Preserve canonical pre-format token counts for all history entering graph formatting */

@@ -1,3 +1,5 @@
+const { z } = require('zod');
+const { tool: createTool } = require('@langchain/core/tools');
 const { logger } = require('@librechat/data-schemas');
 const {
   EnvVar,
@@ -45,7 +47,7 @@ const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools } = require('~/server/services/Config');
 const { getMCPServersRegistry } = require('~/config');
-const { getRoleByName } = require('~/models');
+const { getRoleByName, getSkillByName, upsertSkillByName } = require('~/models');
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -339,6 +341,54 @@ const loadTools = async ({
           logger,
         });
       };
+      continue;
+    } else if (tool === Tools.load_skill || tool === Tools.save_skill) {
+      const isLoadSkill = tool === Tools.load_skill;
+      requestedTools[tool] = async () =>
+        createTool(
+          async (input) => {
+            try {
+              if (isLoadSkill) {
+                const skill = await getSkillByName({ author: user, name: input?.name });
+                if (!skill) {
+                  return `No skill named "${input?.name}" was found.`;
+                }
+                return skill.content || `Skill "${skill.name}" has no content.`;
+              }
+              const saved = await upsertSkillByName(user, {
+                name: input?.name,
+                description: input?.description ?? '',
+                content: input?.content ?? '',
+              });
+              return `Saved skill "${saved.name}".`;
+            } catch (error) {
+              logger.error(`[handleTools] ${isLoadSkill ? 'load_skill' : 'save_skill'} error:`, error);
+              return `Failed to ${isLoadSkill ? 'load' : 'save'} the skill.`;
+            }
+          },
+          isLoadSkill
+            ? {
+                name: Tools.load_skill,
+                description:
+                  "Load the full instructions of one of the user's available skills by name.",
+                schema: z.object({
+                  name: z.string().describe('The exact skill name to load.'),
+                }),
+              }
+            : {
+                name: Tools.save_skill,
+                description:
+                  "Save a reusable skill to the user's skill library. Use only when the user asks to create or save a skill.",
+                schema: z.object({
+                  name: z.string().describe('Short kebab-case skill name.'),
+                  description: z
+                    .string()
+                    .optional()
+                    .describe('One-line description of when to use this skill.'),
+                  content: z.string().describe('Full skill body in Markdown.'),
+                }),
+              },
+        );
       continue;
     } else if (tool && mcpToolPattern.test(tool)) {
       const [toolName, serverName] = tool.split(Constants.mcp_delimiter);

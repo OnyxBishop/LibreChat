@@ -4,6 +4,7 @@ import {
   Bot,
   Brain,
   Bookmark,
+  Sparkles,
   NotebookPen,
   ArrowRightToLine,
   SlidersHorizontal,
@@ -24,6 +25,7 @@ import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
 import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
+import { SkillsPanel } from '~/components/SidePanel/Skills';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
 import { useHasAccess, useMCPServerManager } from '~/hooks';
 import { PromptsAccordion } from '~/components/Prompts';
@@ -145,6 +147,14 @@ export default function useSideNavLinks({
         Component: BookmarkPanel,
       });
     }
+
+    links.push({
+      title: 'com_ui_skills',
+      label: '',
+      icon: Sparkles,
+      id: 'skills',
+      Component: SkillsPanel,
+    });
 
     links.push({
       title: 'com_sidepanel_attach_files',

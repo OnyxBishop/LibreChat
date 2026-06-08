@@ -408,6 +408,10 @@ export const memories = () => `${BASE_URL}/api/memories`;
 export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
 export const memoryPreferences = () => `${memories()}/preferences`;
 
+/* Skills */
+export const skills = () => `${BASE_URL}/api/skills`;
+export const skill = (id: string) => `${skills()}/${id}`;
+
 export const searchPrincipals = (params: q.PrincipalSearchParams) => {
   const { q: query, limit, types } = params;
   let url = `${BASE_URL}/api/permissions/search-principals?q=${encodeURIComponent(query)}`;

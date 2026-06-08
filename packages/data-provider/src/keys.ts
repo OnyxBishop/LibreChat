@@ -53,6 +53,8 @@ export enum QueryKeys {
   banner = 'banner',
   /* Memories */
   memories = 'memories',
+  /* Skills */
+  skills = 'skills',
   principalSearch = 'principalSearch',
   accessRoles = 'accessRoles',
   resourcePermissions = 'resourcePermissions',

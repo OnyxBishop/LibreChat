@@ -182,6 +182,7 @@ const startServer = async () => {
   app.use('/api/conference', routes.conference);
   app.use('/api/banner', routes.banner);
   app.use('/api/memories', routes.memories);
+  app.use('/api/skills', routes.skills);
   app.use('/api/permissions', routes.accessPermissions);
 
   app.use('/api/tags', routes.tags);

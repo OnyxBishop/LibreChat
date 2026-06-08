@@ -19,6 +19,7 @@ import { createTransactionModel } from './transaction';
 import { createPresetModel } from './preset';
 import { createPromptModel } from './prompt';
 import { createPromptGroupModel } from './promptGroup';
+import { createSkillModel } from './skill';
 import { createConversationTagModel } from './conversationTag';
 import { createSharedLinkModel } from './sharedLink';
 import { createToolCallModel } from './toolCall';
@@ -55,6 +56,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     Preset: createPresetModel(mongoose),
     Prompt: createPromptModel(mongoose),
     PromptGroup: createPromptGroupModel(mongoose),
+    Skill: createSkillModel(mongoose),
     ConversationTag: createConversationTagModel(mongoose),
     SharedLink: createSharedLinkModel(mongoose),
     ToolCall: createToolCallModel(mongoose),

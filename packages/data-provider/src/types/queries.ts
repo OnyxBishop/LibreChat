@@ -145,6 +145,29 @@ export type MemoriesResponse = {
   usagePercentage: number | null;
 };
 
+/* Skills */
+export type TSkill = {
+  _id: string;
+  name: string;
+  description: string;
+  content: string;
+  enabled: boolean;
+  author?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TCreateSkill = {
+  name: string;
+  description?: string;
+  content?: string;
+  enabled?: boolean;
+};
+
+export type TUpdateSkill = Partial<TCreateSkill>;
+
+export type TSkillsResponse = TSkill[];
+
 export type PrincipalSearchParams = {
   q: string;
   limit?: number;

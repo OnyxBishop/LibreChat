@@ -1,3 +1,5 @@
+const axios = require('axios');
+const FormData = require('form-data');
 const { v4: uuidv4 } = require('uuid');
 const { logger } = require('@librechat/data-schemas');
 const {
@@ -13,8 +15,9 @@ const {
   getCustomEndpointConfig,
   sanitizeMessageForTransmit,
 } = require('@librechat/api');
+const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { saveBase64Image } = require('~/server/services/Files/process');
-const { saveMessage, saveConvo } = require('~/models');
+const { saveMessage, saveConvo, getFiles } = require('~/models');
 
 /** Resolves header values that may reference environment variables. */
 function resolveHeaders(headers) {
@@ -28,6 +31,61 @@ function resolveHeaders(headers) {
     }
   }
   return resolved;
+}
+
+/**
+ * Edits attached image(s) via the endpoint's `/images/edits` (multipart) — used by the
+ * "edit last image" toggle, which appends the conversation's most recent image to
+ * `req.body.files`. Streams the stored image bytes straight from the file strategy.
+ * Returns normalized base64 images.
+ */
+async function editImage({ baseURL, apiKey, model, prompt, files, params, req, headers, signal }) {
+  const ids = files.map((f) => f.file_id).filter(Boolean);
+  const records = ids.length
+    ? await getFiles({ user: req.user?.id, file_id: { $in: ids } }, {}, {})
+    : [];
+  if (records.length === 0) {
+    throw new Error('Could not resolve the image to edit.');
+  }
+
+  const formData = new FormData();
+  formData.append('model', model);
+  formData.append('prompt', prompt);
+  formData.append('n', '1');
+  if (params.imageSize) {
+    formData.append('size', params.imageSize);
+  }
+  if (params.imageQuality) {
+    formData.append('quality', params.imageQuality);
+  }
+
+  const fieldName = records.length > 1 ? 'image[]' : 'image';
+  for (const file of records) {
+    const source = file.source || req.config?.fileStrategy;
+    const { getDownloadStream } = getStrategyFunctions(source);
+    const stream = await getDownloadStream(req, file.filepath);
+    formData.append(fieldName, stream, {
+      filename: file.filename || 'image.png',
+      contentType: file.type || 'image/png',
+    });
+  }
+
+  const url = `${baseURL.replace(/\/$/, '')}/images/edits`;
+  const resp = await axios.post(url, formData, {
+    headers: { ...formData.getHeaders(), Authorization: `Bearer ${apiKey}`, ...(headers ?? {}) },
+    signal,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+  });
+
+  const data = resp.data?.data ?? [];
+  const images = data
+    .filter((d) => d.b64_json)
+    .map((d) => ({ b64: d.b64_json, mimeType: 'image/png' }));
+  if (images.length === 0) {
+    throw new Error('No image data returned by the provider.');
+  }
+  return images;
 }
 
 /**
@@ -167,20 +225,45 @@ const CustomGenerateController = async (req, res) => {
     }
 
     const params = endpointOption.model_parameters ?? {};
-    const result = await generateImage({
-      baseURL,
-      apiKey,
-      model,
-      prompt,
-      n: 1,
-      size: params.imageSize,
-      quality: params.imageQuality,
-      headers: resolveHeaders(endpointConfig.headers),
-      signal: abortController.signal,
-    });
+    const resolvedHeaders = resolveHeaders(endpointConfig.headers);
+    const attachedImages = (Array.isArray(req.body.files) ? req.body.files : []).filter(
+      (f) =>
+        f &&
+        (f.file_id || f.filepath) &&
+        ((typeof f.type === 'string' && f.type.startsWith('image/')) || f.height != null),
+    );
+
+    let images;
+    if (attachedImages.length > 0) {
+      images = await editImage({
+        baseURL,
+        apiKey,
+        model,
+        prompt,
+        files: attachedImages,
+        params,
+        req,
+        headers: resolvedHeaders,
+        signal: abortController.signal,
+      });
+    } else {
+      const result = await generateImage({
+        baseURL,
+        apiKey,
+        model,
+        prompt,
+        n: 1,
+        size: params.imageSize,
+        quality: params.imageQuality,
+        headers: resolvedHeaders,
+        signal: abortController.signal,
+      });
+      images = result.images;
+    }
 
     const markdownParts = [];
-    for (const image of result.images) {
+    const savedFiles = [];
+    for (const image of images) {
       const file = await saveBase64Image(`data:${image.mimeType};base64,${image.b64}`, {
         req,
         file_id: uuidv4(),
@@ -188,12 +271,26 @@ const CustomGenerateController = async (req, res) => {
         endpoint,
         context: FileContext.image_generation,
       });
+      /**
+       * Markdown renders the image inline (assistant `files` aren't shown in the UI),
+       * while `files` makes it discoverable by the "edit last image" toggle next turn.
+       */
       markdownParts.push(`![generated image](${file.filepath})`);
+      savedFiles.push({
+        file_id: file.file_id,
+        filepath: file.filepath,
+        filename: file.filename,
+        type: file.type,
+        height: file.height,
+        width: file.width,
+        source: file.source,
+      });
     }
 
     await finalize({
       ...baseResponse,
       text: markdownParts.join('\n\n'),
+      files: savedFiles,
       error: false,
     });
   } catch (error) {

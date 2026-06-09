@@ -509,6 +509,21 @@ describe('getOpenAIConfig', () => {
     });
   });
 
+  it('should keep max_tokens (not max_completion_tokens) for GPT-5+ on custom endpoints', () => {
+    const modelOptions = {
+      model: 'gpt-5',
+      max_tokens: 2048,
+    };
+
+    /** Custom OpenAI-compatible proxies reserve/bill on `max_tokens`, not `max_completion_tokens` */
+    const result = getOpenAIConfig(mockApiKey, { modelOptions }, 'AiTunnel');
+
+    expect(result.llmConfig.maxTokens).toBeUndefined();
+    expect(result.llmConfig.modelKwargs).toEqual({
+      max_tokens: 2048,
+    });
+  });
+
   it('should handle GPT-5+ models with existing modelKwargs', () => {
     const modelOptions = {
       model: 'gpt-6',

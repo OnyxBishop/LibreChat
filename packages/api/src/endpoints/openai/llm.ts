@@ -347,9 +347,24 @@ export function getOpenAILLMConfig({
     /\bgpt-[5-9](?:\.\d+)?\b/i.test(llmConfig.model) &&
     llmConfig.maxTokens != null
   ) {
-    const paramName =
-      llmConfig.useResponsesApi === true ? 'max_output_tokens' : 'max_completion_tokens';
-    modelKwargs[paramName] = llmConfig.maxTokens;
+    /**
+     * OpenAI-compatible proxies (custom endpoints — anything that isn't the official
+     * OpenAI/Azure API) reserve and bill funds based on `max_tokens` and ignore
+     * `max_completion_tokens`, so converting the user's output limit to the latter would
+     * make it ineffective (e.g. AiTunnel pre-authorizes the whole context window). Keep
+     * `max_tokens` for those; only the official API needs `max_completion_tokens`.
+     */
+    const isOpenAICompatibleProxy =
+      endpoint != null &&
+      endpoint !== EModelEndpoint.openAI &&
+      endpoint !== EModelEndpoint.azureOpenAI;
+    if (isOpenAICompatibleProxy) {
+      modelKwargs['max_tokens'] = llmConfig.maxTokens;
+    } else {
+      const paramName =
+        llmConfig.useResponsesApi === true ? 'max_output_tokens' : 'max_completion_tokens';
+      modelKwargs[paramName] = llmConfig.maxTokens;
+    }
     delete llmConfig.maxTokens;
     hasModelKwargs = true;
   }

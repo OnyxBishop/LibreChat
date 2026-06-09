@@ -11,6 +11,7 @@ export * from './artifacts';
 export * from './parsers';
 /* custom/dynamic configurations  */
 export * from './generate';
+export * from './modality';
 export * from './models';
 /* mcp */
 export * from './mcp';

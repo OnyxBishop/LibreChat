@@ -1,6 +1,12 @@
 const express = require('express');
-const { generateCheckAccess, skipAgentCheck } = require('@librechat/api');
-const { PermissionTypes, Permissions, PermissionBits } = require('librechat-data-provider');
+const { logger } = require('@librechat/data-schemas');
+const { generateCheckAccess, skipAgentCheck, getCustomEndpointConfig } = require('@librechat/api');
+const {
+  PermissionTypes,
+  Permissions,
+  PermissionBits,
+  classifyGenerationModality,
+} = require('librechat-data-provider');
 const {
   moderateText,
   // validateModel,
@@ -10,6 +16,7 @@ const {
 } = require('~/server/middleware');
 const { initializeClient } = require('~/server/services/Endpoints/agents');
 const AgentController = require('~/server/controllers/agents/request');
+const CustomGenerateController = require('~/server/controllers/CustomGenerate');
 const addTitle = require('~/server/services/Endpoints/agents/title');
 const { getRoleByName } = require('~/models');
 
@@ -32,6 +39,27 @@ router.use(validateConvoAccess);
 router.use(buildEndpointOption);
 
 const controller = async (req, res, next) => {
+  /**
+   * Inline generation routing: image/video/tts models on a custom (OpenAI-compatible)
+   * endpoint must go to the provider's generation API, not `/chat/completions`. Detect
+   * by modality + custom-endpoint config and hand off to the dedicated controller;
+   * everything else uses the normal agents pipeline untouched.
+   */
+  try {
+    const endpointOption = req.body.endpointOption || {};
+    const model = endpointOption.model_parameters?.model || endpointOption.model || req.body.model;
+    if (model && classifyGenerationModality(model) != null) {
+      const customConfig = getCustomEndpointConfig({
+        endpoint: req.body.endpoint,
+        appConfig: req.config,
+      });
+      if (customConfig) {
+        return CustomGenerateController(req, res);
+      }
+    }
+  } catch (error) {
+    logger.error('[agents/chat] inline-generation routing check failed', error);
+  }
   await AgentController(req, res, next, initializeClient, addTitle);
 };
 

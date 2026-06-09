@@ -1,43 +1,14 @@
+import { classifyModelModality, CHAT_MODALITIES } from 'librechat-data-provider';
+import type { Modality, ChatModality } from 'librechat-data-provider';
 import type { TranslationKeys } from '~/hooks/useLocalize';
 
 /**
- * Classifies dynamically-fetched model IDs (e.g. from the AiTunnel custom
- * endpoint, which returns ~200 bare model-id strings) into a modality so the
- * model menu can group them. Classification is purely name-heuristic — the
- * upstream `/models` list carries no modality metadata.
+ * Re-exports the shared modality classifier (single source in `librechat-data-provider`,
+ * so the model menu's grouping can't drift from the backend's generation routing) and
+ * adds the frontend-only label-key mapping + grouping helper for the model menu.
  */
-export type Modality = 'text' | 'image' | 'video' | 'audio' | 'embeddings' | 'rerank' | 'moderation';
-
-/**
- * Ordered patterns, first match wins. Utility/generation modalities are checked
- * before falling back to `text`, and the more specific buckets (audio/video)
- * come before `image` so e.g. `grok-imagine-video` lands in video, not image.
- */
-const MODALITY_PATTERNS: ReadonlyArray<readonly [Modality, RegExp]> = [
-  ['rerank', /rerank/],
-  ['embeddings', /embed/],
-  ['moderation', /moderation/],
-  [
-    'audio',
-    /(^|[-.])(tts|asr|stt)([-.]|$)|transcribe|whisper|voxtral|gpt-audio|(^|[-.])audio([-.]|$)|voice|chirp/,
-  ],
-  ['video', /video|imagine-video|(^|[-.])(veo|sora|kling|seedance|wan|hailuo)([-.]|$)/],
-  ['image', /image|(^|[-.])(flux|seedream)([-.]|$)/],
-];
-
-export function classifyModelModality(modelId: string): Modality {
-  const id = modelId.toLowerCase();
-  for (const [modality, pattern] of MODALITY_PATTERNS) {
-    if (pattern.test(id)) {
-      return modality;
-    }
-  }
-  return 'text';
-}
-
-/** Modalities a user can actually pick as a chat model, in display order. */
-export const CHAT_MODALITIES = ['text', 'image', 'video', 'audio'] as const;
-export type ChatModality = (typeof CHAT_MODALITIES)[number];
+export { classifyModelModality, CHAT_MODALITIES };
+export type { Modality, ChatModality };
 
 const MODALITY_LABEL_KEYS: Record<ChatModality, TranslationKeys> = {
   text: 'com_ui_modality_text',

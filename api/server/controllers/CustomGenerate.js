@@ -141,23 +141,20 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       );
       throw new Error(`Provider /images/edits returned ${response.status}`);
     }
+    /**
+     * Read the chunked body manually. AiTunnel returns the edit result as
+     * `Transfer-Encoding: chunked` (no Content-Length), on which undici's `response.json()`
+     * stalls indefinitely; reading the stream to completion ourselves works reliably.
+     */
     const reader = response.body.getReader();
     const chunks = [];
-    let received = 0;
-    let lastLog = 0;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) {
         break;
       }
-      received += value.length;
       chunks.push(Buffer.from(value));
-      if (received - lastLog >= 250_000) {
-        logger.info(`[CustomGenerate] editImage: body +${received}b...`);
-        lastLog = received;
-      }
     }
-    logger.info(`[CustomGenerate] editImage: body complete ${received}b`);
     json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     logger.info(`[CustomGenerate] editImage: parsed body, ${json?.data?.length ?? 0} datum(s)`);
   } catch (err) {
@@ -260,10 +257,26 @@ const CustomGenerateController = async (req, res) => {
   sendEvent(res, { created: true, message: userMessage });
 
   const abortController = new AbortController();
-  res.on('close', () => abortController.abort());
+  /**
+   * Generation can take 30s+ with no data flowing between `created` and `final`. Without
+   * traffic, proxies (nginx) drop the idle SSE connection before `final` arrives — the
+   * spinner then hangs and the image only appears on reload. A periodic comment keeps it warm.
+   */
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch (error) {
+      logger.debug('[CustomGenerate] heartbeat write failed', error);
+    }
+  }, 15000);
+  res.on('close', () => {
+    clearInterval(heartbeat);
+    abortController.abort();
+  });
 
   /** Persists messages + conversation, then emits the final assistant message. */
   const finalize = async (responseMessage) => {
+    clearInterval(heartbeat);
     await saveMessage({ userId, isTemporary }, userMessage, {
       context: 'CustomGenerate - user message',
     });

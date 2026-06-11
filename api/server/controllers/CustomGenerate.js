@@ -19,7 +19,7 @@ const { saveBase64Image } = require('~/server/services/Files/process');
 const { saveMessage, saveConvo, getFiles } = require('~/models');
 
 /** Hard ceiling on provider calls so a stalled request can never hang the chat forever. */
-const GENERATION_TIMEOUT_MS = 120_000;
+const GENERATION_TIMEOUT_MS = 180_000;
 
 /** Collects a readable stream fully into a Buffer (with a clear error on stall/missing file). */
 function streamToBuffer(stream) {
@@ -113,10 +113,10 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
   }
   const timer = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
 
-  let response;
+  let json;
   try {
     logger.info(`[CustomGenerate] editImage: POST ${url} (fetch, ${bodyBuffer.length}b) ...`);
-    response = await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         ...formData.getHeaders(),
@@ -127,6 +127,19 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       signal: controller.signal,
     });
     logger.info(`[CustomGenerate] editImage: provider responded ${response.status}`);
+    /**
+     * Read the body INSIDE the timeout-protected block. Headers can arrive (200) while the
+     * body still stalls; if the timer is cleared first, `.json()` would hang with no abort.
+     */
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      logger.error(
+        `[CustomGenerate] editImage provider error ${response.status}: ${errText.slice(0, 400)}`,
+      );
+      throw new Error(`Provider /images/edits returned ${response.status}`);
+    }
+    json = await response.json();
+    logger.info(`[CustomGenerate] editImage: parsed body, ${json?.data?.length ?? 0} datum(s)`);
   } catch (err) {
     logger.error(
       `[CustomGenerate] editImage fetch failed: name=${err?.name} msg=${err?.message} cause=${err?.cause?.code ?? err?.cause?.message ?? ''}`,
@@ -139,15 +152,6 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
     }
   }
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    logger.error(
-      `[CustomGenerate] editImage provider error ${response.status}: ${errText.slice(0, 400)}`,
-    );
-    throw new Error(`Provider /images/edits returned ${response.status}`);
-  }
-
-  const json = await response.json();
   const data = json?.data ?? [];
   const images = data
     .filter((d) => d.b64_json)
@@ -335,6 +339,7 @@ const CustomGenerateController = async (req, res) => {
       images = result.images;
     }
 
+    logger.info(`[CustomGenerate] saving ${images.length} image(s) + finalizing`);
     const markdownParts = [];
     const savedFiles = [];
     for (const image of images) {

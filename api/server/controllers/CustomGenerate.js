@@ -248,13 +248,27 @@ const CustomGenerateController = async (req, res) => {
     model,
   };
 
+  /**
+   * `Content-Encoding: identity` makes the global `compression` middleware skip this response
+   * — otherwise it buffers the whole SSE stream in zlib and nothing reaches the client until
+   * the request ends (spinner hangs; image only shows on reload). Mirrors the agents SSE setup.
+   */
+  res.setHeader('Content-Encoding', 'identity');
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
+  /** Flush after every write so compression (if any) can't withhold the bytes. */
+  const flush = () => {
+    if (typeof res.flush === 'function') {
+      res.flush();
+    }
+  };
+
   sendEvent(res, { created: true, message: userMessage });
+  flush();
 
   const abortController = new AbortController();
   /**
@@ -265,6 +279,7 @@ const CustomGenerateController = async (req, res) => {
   const heartbeat = setInterval(() => {
     try {
       res.write(': keepalive\n\n');
+      flush();
     } catch (error) {
       logger.debug('[CustomGenerate] heartbeat write failed', error);
     }
@@ -304,6 +319,7 @@ const CustomGenerateController = async (req, res) => {
       requestMessage: sanitizeMessageForTransmit(userMessage),
       responseMessage,
     });
+    flush();
     res.end();
   };
 

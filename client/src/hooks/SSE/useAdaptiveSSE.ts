@@ -1,4 +1,4 @@
-import { isAssistantsEndpoint } from 'librechat-data-provider';
+import { isAssistantsEndpoint, classifyGenerationModality } from 'librechat-data-provider';
 import type { TSubmission } from 'librechat-data-provider';
 import type { EventHandlerParams } from './useEventHandlers';
 import useResumableSSE from './useResumableSSE';
@@ -31,7 +31,14 @@ export default function useAdaptiveSSE(
   const endpointType = submission?.conversation?.endpointType;
   const actualEndpoint = endpointType ?? endpoint;
   const isAssistants = isAssistantsEndpoint(actualEndpoint);
-  const resumableEnabled = !isAssistants;
+  /**
+   * Image/video/tts generation on a custom endpoint is served by CustomGenerate, which
+   * streams inline over the POST response (not the resumable job protocol). Those models
+   * must use the standard inline `useSSE`, or the resumable hook would read the SSE body as
+   * `{ streamId }`, find none, and never subscribe — leaving the spinner stuck.
+   */
+  const isGeneration = classifyGenerationModality(submission?.conversation?.model ?? '') != null;
+  const resumableEnabled = !isAssistants && !isGeneration;
 
   useSSE(resumableEnabled ? null : submission, chatHelpers, isAddedRequest, runIndex);
 

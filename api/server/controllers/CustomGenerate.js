@@ -91,20 +91,52 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       contentType: file.type || 'image/png',
     });
   }
+  /**
+   * Set Content-Length explicitly. Without it, axios sends the multipart body with
+   * `Transfer-Encoding: chunked`, which the AiTunnel proxy doesn't terminate — it waits
+   * for a length-delimited body forever (the real cause of the hang; JSON generation works
+   * because axios sets Content-Length for it automatically). Buffers give an exact length.
+   */
+  const contentLength = formData.getLengthSync();
   logger.info(
     `[CustomGenerate] editImage: ${records.length} image(s) [${records
       .map((r) => `${r.source}:${r.type}`)
-      .join(', ')}] -> ${model}`,
+      .join(', ')}] -> ${model}, body=${contentLength}b`,
   );
 
+  /** Own timeout via AbortController — axios `timeout` did not fire on the stalled upload. */
+  const timeoutController = new AbortController();
+  const onParentAbort = () => timeoutController.abort();
+  if (signal) {
+    if (signal.aborted) {
+      timeoutController.abort();
+    } else {
+      signal.addEventListener('abort', onParentAbort, { once: true });
+    }
+  }
+  const timer = setTimeout(() => timeoutController.abort(), GENERATION_TIMEOUT_MS);
+
   const url = `${baseURL.replace(/\/$/, '')}/images/edits`;
-  const resp = await axios.post(url, formData, {
-    headers: { ...formData.getHeaders(), Authorization: `Bearer ${apiKey}`, ...(headers ?? {}) },
-    timeout: GENERATION_TIMEOUT_MS,
-    signal,
-    maxBodyLength: Infinity,
-    maxContentLength: Infinity,
-  });
+  let resp;
+  try {
+    resp = await axios.post(url, formData, {
+      headers: {
+        ...formData.getHeaders(),
+        'Content-Length': contentLength,
+        Authorization: `Bearer ${apiKey}`,
+        ...(headers ?? {}),
+      },
+      timeout: GENERATION_TIMEOUT_MS,
+      signal: timeoutController.signal,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    });
+  } finally {
+    clearTimeout(timer);
+    if (signal) {
+      signal.removeEventListener('abort', onParentAbort);
+    }
+  }
 
   const data = resp.data?.data ?? [];
   const images = data

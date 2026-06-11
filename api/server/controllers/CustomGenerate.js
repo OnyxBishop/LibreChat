@@ -97,14 +97,23 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
    * for a length-delimited body forever (the real cause of the hang; JSON generation works
    * because axios sets Content-Length for it automatically). Buffers give an exact length.
    */
-  const contentLength = formData.getLengthSync();
+  /**
+   * Serialize the whole form to a single Buffer. `getLengthSync()` can under-count the
+   * closing boundary, producing a Content-Length the AiTunnel multipart parser waits past
+   * forever (the hang). `getBuffer()` yields the exact bytes, so the length is guaranteed
+   * correct and the body is sent in one shot (no chunked encoding).
+   */
+  const bodyBuffer = formData.getBuffer();
   logger.info(
     `[CustomGenerate] editImage: ${records.length} image(s) [${records
       .map((r) => `${r.source}:${r.type}`)
-      .join(', ')}] -> ${model}, body=${contentLength}b`,
+      .join(', ')}] -> ${model}, body=${bodyBuffer.length}b`,
   );
 
-  /** Own timeout via AbortController — axios `timeout` did not fire on the stalled upload. */
+  /**
+   * Hard timeout via Promise.race + abort. axios `timeout` is socket-inactivity based and
+   * never fired against AiTunnel's stalled edit response, so we guarantee settlement here.
+   */
   const timeoutController = new AbortController();
   const onParentAbort = () => timeoutController.abort();
   if (signal) {
@@ -114,23 +123,37 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       signal.addEventListener('abort', onParentAbort, { once: true });
     }
   }
-  const timer = setTimeout(() => timeoutController.abort(), GENERATION_TIMEOUT_MS);
+  let timer;
+  const hardTimeout = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => {
+      timeoutController.abort();
+      reject(new Error(`Image edit timed out after ${GENERATION_TIMEOUT_MS / 1000}s`));
+    }, GENERATION_TIMEOUT_MS);
+  });
 
   const url = `${baseURL.replace(/\/$/, '')}/images/edits`;
   let resp;
   try {
-    resp = await axios.post(url, formData, {
-      headers: {
-        ...formData.getHeaders(),
-        'Content-Length': contentLength,
-        Authorization: `Bearer ${apiKey}`,
-        ...(headers ?? {}),
-      },
-      timeout: GENERATION_TIMEOUT_MS,
-      signal: timeoutController.signal,
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
-    });
+    resp = await Promise.race([
+      axios.post(url, bodyBuffer, {
+        headers: {
+          ...formData.getHeaders(),
+          'Content-Length': bodyBuffer.length,
+          Authorization: `Bearer ${apiKey}`,
+          ...(headers ?? {}),
+        },
+        timeout: GENERATION_TIMEOUT_MS,
+        signal: timeoutController.signal,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+      }),
+      hardTimeout,
+    ]);
+  } catch (err) {
+    logger.error(
+      `[CustomGenerate] editImage POST failed: code=${err?.code} status=${err?.response?.status} msg=${err?.message} data=${JSON.stringify(err?.response?.data)?.slice(0, 500)}`,
+    );
+    throw err;
   } finally {
     clearTimeout(timer);
     if (signal) {

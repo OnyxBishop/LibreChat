@@ -126,10 +126,13 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       body: bodyBuffer,
       signal: controller.signal,
     });
-    logger.info(`[CustomGenerate] editImage: provider responded ${response.status}`);
+    logger.info(
+      `[CustomGenerate] editImage: provider responded ${response.status} ct=${response.headers.get('content-type')} cl=${response.headers.get('content-length')} te=${response.headers.get('transfer-encoding')}`,
+    );
     /**
-     * Read the body INSIDE the timeout-protected block. Headers can arrive (200) while the
-     * body still stalls; if the timer is cleared first, `.json()` would hang with no abort.
+     * Read the body INSIDE the timeout-protected block. Headers (200) can arrive while the
+     * body still stalls; if the timer is cleared first, the read would hang with no abort.
+     * Read manually chunk-by-chunk so the logs show exactly how far the body got.
      */
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
@@ -138,7 +141,24 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       );
       throw new Error(`Provider /images/edits returned ${response.status}`);
     }
-    json = await response.json();
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    let lastLog = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      received += value.length;
+      chunks.push(Buffer.from(value));
+      if (received - lastLog >= 250_000) {
+        logger.info(`[CustomGenerate] editImage: body +${received}b...`);
+        lastLog = received;
+      }
+    }
+    logger.info(`[CustomGenerate] editImage: body complete ${received}b`);
+    json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     logger.info(`[CustomGenerate] editImage: parsed body, ${json?.data?.length ?? 0} datum(s)`);
   } catch (err) {
     logger.error(

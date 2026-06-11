@@ -19,6 +19,19 @@ const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { saveBase64Image } = require('~/server/services/Files/process');
 const { saveMessage, saveConvo, getFiles } = require('~/models');
 
+/** Hard ceiling on provider calls so a stalled request can never hang the chat forever. */
+const GENERATION_TIMEOUT_MS = 180_000;
+
+/** Collects a readable stream fully into a Buffer (with a clear error on stall/missing file). */
+function streamToBuffer(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', (chunk) => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+}
+
 /** Resolves header values that may reference environment variables. */
 function resolveHeaders(headers) {
   const resolved = {};
@@ -36,7 +49,7 @@ function resolveHeaders(headers) {
 /**
  * Edits attached image(s) via the endpoint's `/images/edits` (multipart) — used by the
  * "edit last image" toggle, which appends the conversation's most recent image to
- * `req.body.files`. Streams the stored image bytes straight from the file strategy.
+ * `req.body.files`. Reads the stored image bytes via the file strategy into a Buffer.
  * Returns normalized base64 images.
  */
 async function editImage({ baseURL, apiKey, model, prompt, files, params, req, headers, signal }) {
@@ -63,16 +76,31 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
   for (const file of records) {
     const source = file.source || req.config?.fileStrategy;
     const { getDownloadStream } = getStrategyFunctions(source);
+    if (typeof getDownloadStream !== 'function') {
+      throw new Error(`No download stream available for file source "${source}".`);
+    }
     const stream = await getDownloadStream(req, file.filepath);
-    formData.append(fieldName, stream, {
+    /**
+     * Buffer the bytes instead of appending the lazy fs stream: with a Buffer the
+     * multipart Content-Length is exact, so `axios + form-data` can't stall waiting
+     * on a stream that never finishes (the cause of the infinite-spinner hang).
+     */
+    const buffer = await streamToBuffer(stream);
+    formData.append(fieldName, buffer, {
       filename: file.filename || 'image.png',
       contentType: file.type || 'image/png',
     });
   }
+  logger.info(
+    `[CustomGenerate] editImage: ${records.length} image(s) [${records
+      .map((r) => `${r.source}:${r.type}`)
+      .join(', ')}] -> ${model}`,
+  );
 
   const url = `${baseURL.replace(/\/$/, '')}/images/edits`;
   const resp = await axios.post(url, formData, {
     headers: { ...formData.getHeaders(), Authorization: `Bearer ${apiKey}`, ...(headers ?? {}) },
+    timeout: GENERATION_TIMEOUT_MS,
     signal,
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
@@ -226,11 +254,15 @@ const CustomGenerateController = async (req, res) => {
 
     const params = endpointOption.model_parameters ?? {};
     const resolvedHeaders = resolveHeaders(endpointConfig.headers);
-    const attachedImages = (Array.isArray(req.body.files) ? req.body.files : []).filter(
+    const incomingFiles = Array.isArray(req.body.files) ? req.body.files : [];
+    const attachedImages = incomingFiles.filter(
       (f) =>
         f &&
         (f.file_id || f.filepath) &&
         ((typeof f.type === 'string' && f.type.startsWith('image/')) || f.height != null),
+    );
+    logger.info(
+      `[CustomGenerate] image request: ${incomingFiles.length} file(s) in body, ${attachedImages.length} image(s) -> ${attachedImages.length > 0 ? 'edit' : 'generate'}`,
     );
 
     let images;

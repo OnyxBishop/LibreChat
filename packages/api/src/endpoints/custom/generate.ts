@@ -56,6 +56,8 @@ interface OpenAIImageResponse {
 
 const DEFAULT_SIZE = '1024x1024';
 const DEFAULT_QUALITY = 'low';
+/** Hard ceiling on provider calls so a stalled request can never hang the chat forever. */
+export const GENERATION_TIMEOUT_MS = 180_000;
 
 function joinUrl(baseURL: string, path: string): string {
   return `${baseURL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
@@ -75,6 +77,7 @@ async function urlToBase64(
     const resp = await axios.get<ArrayBuffer>(url, {
       responseType: 'arraybuffer',
       headers: { Authorization: `Bearer ${apiKey}` },
+      timeout: GENERATION_TIMEOUT_MS,
       signal,
     });
     const mimeType =
@@ -102,6 +105,7 @@ export async function generateImage(params: GenerateImageParams): Promise<Genera
         'Content-Type': 'application/json',
         ...(headers ?? {}),
       },
+      timeout: GENERATION_TIMEOUT_MS,
       signal,
     },
   );

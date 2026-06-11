@@ -1,4 +1,3 @@
-const axios = require('axios');
 const FormData = require('form-data');
 const { v4: uuidv4 } = require('uuid');
 const { logger } = require('@librechat/data-schemas');
@@ -20,7 +19,7 @@ const { saveBase64Image } = require('~/server/services/Files/process');
 const { saveMessage, saveConvo, getFiles } = require('~/models');
 
 /** Hard ceiling on provider calls so a stalled request can never hang the chat forever. */
-const GENERATION_TIMEOUT_MS = 180_000;
+const GENERATION_TIMEOUT_MS = 120_000;
 
 /** Collects a readable stream fully into a Buffer (with a clear error on stall/missing file). */
 function streamToBuffer(stream) {
@@ -80,29 +79,14 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       throw new Error(`No download stream available for file source "${source}".`);
     }
     const stream = await getDownloadStream(req, file.filepath);
-    /**
-     * Buffer the bytes instead of appending the lazy fs stream: with a Buffer the
-     * multipart Content-Length is exact, so `axios + form-data` can't stall waiting
-     * on a stream that never finishes (the cause of the infinite-spinner hang).
-     */
+    /** Buffer the bytes (not the lazy fs stream) so the whole form can be serialized below. */
     const buffer = await streamToBuffer(stream);
     formData.append(fieldName, buffer, {
       filename: file.filename || 'image.png',
       contentType: file.type || 'image/png',
     });
   }
-  /**
-   * Set Content-Length explicitly. Without it, axios sends the multipart body with
-   * `Transfer-Encoding: chunked`, which the AiTunnel proxy doesn't terminate — it waits
-   * for a length-delimited body forever (the real cause of the hang; JSON generation works
-   * because axios sets Content-Length for it automatically). Buffers give an exact length.
-   */
-  /**
-   * Serialize the whole form to a single Buffer. `getLengthSync()` can under-count the
-   * closing boundary, producing a Content-Length the AiTunnel multipart parser waits past
-   * forever (the hang). `getBuffer()` yields the exact bytes, so the length is guaranteed
-   * correct and the body is sent in one shot (no chunked encoding).
-   */
+  /** Serialize the whole form to one Buffer so undici can send it with an exact length. */
   const bodyBuffer = formData.getBuffer();
   logger.info(
     `[CustomGenerate] editImage: ${records.length} image(s) [${records
@@ -111,47 +95,41 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
   );
 
   /**
-   * Hard timeout via Promise.race + abort. axios `timeout` is socket-inactivity based and
-   * never fired against AiTunnel's stalled edit response, so we guarantee settlement here.
+   * Use native fetch (undici) with an AbortController timeout. The axios + form-data path
+   * left the request in a state where neither axios's own timeout nor a JS timer rescued it;
+   * undici reliably aborts at any phase. Granular logs pinpoint exactly where the call dies.
+   * undici sets Content-Length from the Buffer body itself, so we only pass the multipart
+   * Content-Type (from `getHeaders()`).
    */
-  const timeoutController = new AbortController();
-  const onParentAbort = () => timeoutController.abort();
+  const url = `${baseURL.replace(/\/$/, '')}/images/edits`;
+  const controller = new AbortController();
+  const onParentAbort = () => controller.abort();
   if (signal) {
     if (signal.aborted) {
-      timeoutController.abort();
+      controller.abort();
     } else {
       signal.addEventListener('abort', onParentAbort, { once: true });
     }
   }
-  let timer;
-  const hardTimeout = new Promise((_resolve, reject) => {
-    timer = setTimeout(() => {
-      timeoutController.abort();
-      reject(new Error(`Image edit timed out after ${GENERATION_TIMEOUT_MS / 1000}s`));
-    }, GENERATION_TIMEOUT_MS);
-  });
+  const timer = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
 
-  const url = `${baseURL.replace(/\/$/, '')}/images/edits`;
-  let resp;
+  let response;
   try {
-    resp = await Promise.race([
-      axios.post(url, bodyBuffer, {
-        headers: {
-          ...formData.getHeaders(),
-          'Content-Length': bodyBuffer.length,
-          Authorization: `Bearer ${apiKey}`,
-          ...(headers ?? {}),
-        },
-        timeout: GENERATION_TIMEOUT_MS,
-        signal: timeoutController.signal,
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity,
-      }),
-      hardTimeout,
-    ]);
+    logger.info(`[CustomGenerate] editImage: POST ${url} (fetch, ${bodyBuffer.length}b) ...`);
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...formData.getHeaders(),
+        Authorization: `Bearer ${apiKey}`,
+        ...(headers ?? {}),
+      },
+      body: bodyBuffer,
+      signal: controller.signal,
+    });
+    logger.info(`[CustomGenerate] editImage: provider responded ${response.status}`);
   } catch (err) {
     logger.error(
-      `[CustomGenerate] editImage POST failed: code=${err?.code} status=${err?.response?.status} msg=${err?.message} data=${JSON.stringify(err?.response?.data)?.slice(0, 500)}`,
+      `[CustomGenerate] editImage fetch failed: name=${err?.name} msg=${err?.message} cause=${err?.cause?.code ?? err?.cause?.message ?? ''}`,
     );
     throw err;
   } finally {
@@ -161,7 +139,16 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
     }
   }
 
-  const data = resp.data?.data ?? [];
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    logger.error(
+      `[CustomGenerate] editImage provider error ${response.status}: ${errText.slice(0, 400)}`,
+    );
+    throw new Error(`Provider /images/edits returned ${response.status}`);
+  }
+
+  const json = await response.json();
+  const data = json?.data ?? [];
   const images = data
     .filter((d) => d.b64_json)
     .map((d) => ({ b64: d.b64_json, mimeType: 'image/png' }));

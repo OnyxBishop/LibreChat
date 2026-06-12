@@ -430,13 +430,26 @@ const CustomGenerateController = async (req, res) => {
       error: false,
     });
   } catch (error) {
-    const providerMessage =
-      error?.response?.data?.error?.message || error?.message || 'Image generation failed.';
-    logger.error('[CustomGenerate] Generation failed:', providerMessage);
+    /**
+     * A provider that never responds trips our AbortController timeout (`AbortError`) or
+     * axios's own timeout (`ECONNABORTED`). Image edits on gpt-image-1 are slow and the
+     * upstream occasionally stalls entirely; surface a clear, actionable message instead of
+     * the raw "This operation was aborted" so the user knows to simply retry.
+     */
+    const isTimeout =
+      error?.name === 'AbortError' ||
+      error?.code === 'ECONNABORTED' ||
+      /aborted|timeout/i.test(error?.message ?? '');
+    const providerMessage = isTimeout
+      ? `Провайдер изображений не ответил за ${Math.round(
+          GENERATION_TIMEOUT_MS / 1000,
+        )} с (возможно, перегружен). Попробуйте ещё раз.`
+      : error?.response?.data?.error?.message || error?.message || 'Image generation failed.';
+    logger.error('[CustomGenerate] Generation failed:', error?.message || providerMessage);
     if (res.headersSent && !res.writableEnded) {
       await finalize({
         ...baseResponse,
-        text: `Не удалось сгенерировать: ${providerMessage}`,
+        text: isTimeout ? providerMessage : `Не удалось сгенерировать: ${providerMessage}`,
         error: true,
       });
     } else if (!res.headersSent) {

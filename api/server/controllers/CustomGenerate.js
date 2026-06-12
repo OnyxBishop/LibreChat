@@ -274,11 +274,19 @@ const CustomGenerateController = async (req, res) => {
   /**
    * Generation can take 30s+ with no data flowing between `created` and `final`. Without
    * traffic, proxies (nginx) drop the idle SSE connection before `final` arrives — the
-   * spinner then hangs and the image only appears on reload. A periodic comment keeps it warm.
+   * spinner then hangs and the image only appears on reload. A periodic no-op event keeps
+   * the connection warm.
+   *
+   * It MUST be a real event (`data: {"ping":true}`), not a bare SSE comment (`: keepalive`):
+   * this inline POST stream is read by sse.js (not the browser's native EventSource), and
+   * sse.js dispatches comment lines as empty-data `message` events. The client then does
+   * `JSON.parse('')`, which throws and breaks the stream, so the trailing `final` event is
+   * never handled and the spinner hangs forever (only the page reload reveals the saved
+   * image). A well-formed JSON event parses cleanly and matches no client handler branch.
    */
   const heartbeat = setInterval(() => {
     try {
-      res.write(': keepalive\n\n');
+      sendEvent(res, { ping: true });
       flush();
     } catch (error) {
       logger.debug('[CustomGenerate] heartbeat write failed', error);

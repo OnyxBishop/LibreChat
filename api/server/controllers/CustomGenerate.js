@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { logger } = require('@librechat/data-schemas');
 const {
   Constants,
+  CacheKeys,
   FileContext,
   extractEnvVariable,
   getResponseSender,
@@ -17,6 +18,7 @@ const {
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { saveBase64Image } = require('~/server/services/Files/process');
 const { saveMessage, saveConvo, getFiles } = require('~/models');
+const getLogStores = require('~/cache/getLogStores');
 
 /** Hard ceiling on provider calls so a stalled request can never hang the chat forever. */
 const GENERATION_TIMEOUT_MS = 180_000;
@@ -319,6 +321,21 @@ const CustomGenerateController = async (req, res) => {
       logger.error('[CustomGenerate] Failed to save conversation:', error);
     }
     conversation = conversation || { conversationId, endpoint, model, title };
+
+    /**
+     * Seed the GEN_TITLE cache so the client's `GET /convos/gen_title/:id` poll (fired once per
+     * new conversation) returns this title immediately. We set the title synchronously here (not
+     * via the async `titleConvo` flow), so without seeding the cache the client would back off
+     * ~15s and then 404 — a wasted server-side wait plus a console error, despite the title
+     * already being saved on the conversation.
+     */
+    if (title) {
+      try {
+        await getLogStores(CacheKeys.GEN_TITLE).set(`${userId}-${conversationId}`, title, 120000);
+      } catch (error) {
+        logger.debug('[CustomGenerate] failed to seed gen_title cache', error);
+      }
+    }
 
     sendEvent(res, {
       final: true,

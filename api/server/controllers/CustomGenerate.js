@@ -20,8 +20,14 @@ const { saveBase64Image } = require('~/server/services/Files/process');
 const { saveMessage, saveConvo, getFiles } = require('~/models');
 const getLogStores = require('~/cache/getLogStores');
 
-/** Hard ceiling on provider calls so a stalled request can never hang the chat forever. */
-const GENERATION_TIMEOUT_MS = 180_000;
+/**
+ * Hard ceiling on provider calls so a stalled request can never hang the chat forever.
+ * Image EDITS (`/images/edits`) on gpt-image-1 are much slower than generation — a large
+ * source image (~750KB) can take >3min — so this is set generously. The 15s SSE heartbeat
+ * keeps the client connection warm for the whole wait; on timeout the user gets a clear
+ * message (below), not a raw "This operation was aborted".
+ */
+const GENERATION_TIMEOUT_MS = 300_000;
 
 /** Collects a readable stream fully into a Buffer (with a clear error on stall/missing file). */
 function streamToBuffer(stream) {
@@ -113,7 +119,12 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
       signal.addEventListener('abort', onParentAbort, { once: true });
     }
   }
-  const timer = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
+  /** Distinguishes "we hit the timeout" from "the client disconnected" — both surface as AbortError. */
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, GENERATION_TIMEOUT_MS);
 
   let json;
   try {
@@ -163,6 +174,13 @@ async function editImage({ baseURL, apiKey, model, prompt, files, params, req, h
     logger.error(
       `[CustomGenerate] editImage fetch failed: name=${err?.name} msg=${err?.message} cause=${err?.cause?.code ?? err?.cause?.message ?? ''}`,
     );
+    if (timedOut) {
+      throw new Error(
+        `провайдер не ответил за ${Math.round(
+          GENERATION_TIMEOUT_MS / 1000,
+        )} с (картинка слишком большая или сервис перегружен) — попробуйте ещё раз или уменьшите изображение`,
+      );
+    }
     throw err;
   } finally {
     clearTimeout(timer);

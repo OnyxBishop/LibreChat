@@ -55,6 +55,8 @@ export enum QueryKeys {
   memories = 'memories',
   /* Skills */
   skills = 'skills',
+  /* Conference sessions */
+  conferenceSessions = 'conferenceSessions',
   principalSearch = 'principalSearch',
   accessRoles = 'accessRoles',
   resourcePermissions = 'resourcePermissions',

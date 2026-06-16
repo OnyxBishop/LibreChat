@@ -417,6 +417,10 @@ export const skillFile = (id: string, name: string) =>
 export const skillExport = (id: string) => `${skill(id)}/export`;
 export const skillImport = () => `${skills()}/import`;
 
+/* Conference sessions */
+export const conferenceSessions = () => `${BASE_URL}/api/conference/sessions`;
+export const conferenceSession = (id: string) => `${conferenceSessions()}/${id}`;
+
 export const searchPrincipals = (params: q.PrincipalSearchParams) => {
   const { q: query, limit, types } = params;
   let url = `${BASE_URL}/api/permissions/search-principals?q=${encodeURIComponent(query)}`;

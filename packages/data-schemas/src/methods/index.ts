@@ -29,6 +29,10 @@ import { createToolCallMethods, type ToolCallMethods } from './toolCall';
 import { createCategoriesMethods, type CategoriesMethods } from './categories';
 import { createPresetMethods, type PresetMethods } from './preset';
 import { createSkillMethods, type SkillMethods } from './skill';
+import {
+  createConferenceSessionMethods,
+  type ConferenceSessionMethods,
+} from './conference';
 /* Tier 2 — Moderate (service deps injected) */
 import { createConversationTagMethods, type ConversationTagMethods } from './conversationTag';
 import { createMessageMethods, type MessageMethods } from './message';
@@ -77,6 +81,7 @@ export type AllMethods = UserMethods &
   CategoriesMethods &
   PresetMethods &
   SkillMethods &
+  ConferenceSessionMethods &
   ConversationTagMethods &
   MessageMethods &
   ConversationMethods &
@@ -196,6 +201,7 @@ export function createMethods(
     ...createCategoriesMethods(mongoose),
     ...createPresetMethods(mongoose),
     ...createSkillMethods(mongoose),
+    ...createConferenceSessionMethods(mongoose),
     /* Tier 2 */
     ...createConversationTagMethods(mongoose),
     ...messageMethods,
@@ -236,6 +242,7 @@ export type {
   CategoriesMethods,
   PresetMethods,
   SkillMethods,
+  ConferenceSessionMethods,
   ConversationTagMethods,
   MessageMethods,
   ConversationMethods,

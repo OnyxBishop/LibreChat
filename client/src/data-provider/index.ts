@@ -6,6 +6,8 @@ export * from './Files';
 export * from './Memories';
 /* Skills */
 export * from './Skills';
+/* Conference sessions */
+export * from './Conference';
 export * from './Messages';
 export * from './Misc';
 export * from './Tools';

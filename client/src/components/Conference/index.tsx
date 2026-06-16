@@ -1,15 +1,18 @@
-import { useRef } from 'react';
-import { useRecoilState, useRecoilValue } from 'recoil';
+import { useRef, useState } from 'react';
+import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
-import { Mic, MicOff, Radio, Send, Loader2, Trash2 } from 'lucide-react';
+import { Mic, MicOff, Radio, Send, Loader2, Trash2, History, Download } from 'lucide-react';
 import type { TFile } from 'librechat-data-provider';
 import type { RecorderError } from '~/hooks/Conference/useConferenceRecorder';
 import useConferenceRecorder from '~/hooks/Conference/useConferenceRecorder';
 import useConferenceAssist from '~/hooks/Conference/useConferenceAssist';
+import useConferenceAutosave from '~/hooks/Conference/useConferenceAutosave';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
+import { downloadTranscript } from '~/utils/conferenceTranscript';
 import { useLocalize } from '~/hooks';
 import { useGetFiles } from '~/data-provider';
 import ConferenceSettings from './Settings';
+import HistoryDialog from './HistoryDialog';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -45,6 +48,11 @@ export default function Conference() {
   const [systemSegments, setSystemSegments] = useRecoilState(store.conferenceSystemSegments);
   const [micSegments, setMicSegments] = useRecoilState(store.conferenceMicSegments);
   const [suggestions, setSuggestions] = useRecoilState(store.conferenceSuggestions);
+  const setCurrentSessionId = useSetRecoilState(store.conferenceCurrentSessionId);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  /* persist the live transcript to the server as it grows */
+  useConferenceAutosave({ untitledLabel: localize('com_nav_conference') });
 
   /* endpoint + models */
   const conversation = useRecoilValue(store.conversationByIndex(0));
@@ -137,8 +145,27 @@ export default function Conference() {
     setSystemSegments([]);
     setMicSegments([]);
     setSuggestions([]);
+    setCurrentSessionId(null);
     lastSentLenRef.current = 0;
   };
+
+  const hasTranscript =
+    systemSegments.length > 0 || micSegments.length > 0 || suggestions.length > 0;
+
+  const handleDownload = () =>
+    downloadTranscript(
+      {
+        title: `${localize('com_nav_conference')} ${new Date().toLocaleDateString()}`,
+        systemSegments,
+        micSegments,
+        suggestions,
+      },
+      {
+        system: localize('com_conf_system_audio'),
+        mic: localize('com_conf_mic'),
+        suggestions: localize('com_conf_suggestions'),
+      },
+    );
 
   const systemErrorKey = recorderErrorKey(systemRecorder.error);
   const micErrorKey = recorderErrorKey(micRecorder.error);
@@ -154,13 +181,30 @@ export default function Conference() {
             </h1>
             <span className="text-xs text-text-tertiary">{localize('com_conf_subtitle')}</span>
           </div>
-          <button
-            onClick={handleClear}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-text-secondary hover:bg-surface-hover"
-          >
-            <Trash2 className="h-4 w-4" />
-            {localize('com_conf_clear')}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setHistoryOpen(true)}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-text-secondary hover:bg-surface-hover"
+            >
+              <History className="h-4 w-4" />
+              {localize('com_conf_history')}
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={!hasTranscript}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              {localize('com_conf_download')}
+            </button>
+            <button
+              onClick={handleClear}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-text-secondary hover:bg-surface-hover"
+            >
+              <Trash2 className="h-4 w-4" />
+              {localize('com_conf_clear')}
+            </button>
+          </div>
         </header>
 
         {/* transcript + suggestions */}
@@ -288,6 +332,7 @@ export default function Conference() {
       </main>
 
       <ConferenceSettings models={models} files={ragFiles} />
+      <HistoryDialog open={historyOpen} setOpen={setHistoryOpen} />
     </div>
   );
 }

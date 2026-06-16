@@ -1070,6 +1070,28 @@ export const importSkill = (formData: FormData): Promise<q.TSkill> => {
   return request.postMultiPart(endpoints.skillImport(), formData);
 };
 
+/* Conference sessions */
+export const getConferenceSessions = (): Promise<q.TConferenceSessionsResponse> => {
+  return request.get(endpoints.conferenceSessions());
+};
+
+export const createConferenceSession = (
+  data: q.TCreateConferenceSession,
+): Promise<q.TConferenceSession> => {
+  return request.post(endpoints.conferenceSessions(), data);
+};
+
+export const updateConferenceSession = (
+  id: string,
+  data: q.TUpdateConferenceSession,
+): Promise<q.TConferenceSession> => {
+  return request.patch(endpoints.conferenceSession(id), data);
+};
+
+export const deleteConferenceSession = (id: string): Promise<{ message: string }> => {
+  return request.delete(endpoints.conferenceSession(id));
+};
+
 export function searchPrincipals(
   params: q.PrincipalSearchParams,
 ): Promise<q.PrincipalSearchResponse> {

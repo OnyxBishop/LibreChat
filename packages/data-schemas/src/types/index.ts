@@ -25,6 +25,8 @@ export * from './memory';
 export * from './prompts';
 /* Skills */
 export * from './skill';
+/* Conference sessions */
+export * from './conference';
 /* Access Control */
 export * from './accessRole';
 export * from './aclEntry';

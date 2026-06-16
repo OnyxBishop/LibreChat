@@ -176,6 +176,38 @@ export type TSkillFile = {
 
 export type TSkillFilesResponse = TSkillFile[];
 
+/* Conference sessions */
+export type TConferenceSegment = {
+  text: string;
+  timestamp?: string;
+};
+
+export type TConferenceSuggestion = {
+  text: string;
+};
+
+export type TConferenceSession = {
+  _id: string;
+  title: string;
+  systemSegments: TConferenceSegment[];
+  micSegments: TConferenceSegment[];
+  suggestions: TConferenceSuggestion[];
+  author?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TCreateConferenceSession = {
+  title?: string;
+  systemSegments?: TConferenceSegment[];
+  micSegments?: TConferenceSegment[];
+  suggestions?: TConferenceSuggestion[];
+};
+
+export type TUpdateConferenceSession = TCreateConferenceSession;
+
+export type TConferenceSessionsResponse = TConferenceSession[];
+
 export type PrincipalSearchParams = {
   q: string;
   limit?: number;

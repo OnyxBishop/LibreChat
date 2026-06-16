@@ -36,6 +36,11 @@ const conferenceSuggestions = atom<ConferenceSuggestion[]>({
   key: 'conferenceSuggestions',
   default: [],
 });
+/** Id of the server-side session the current transcript is autosaved to (null = not yet saved). */
+const conferenceCurrentSessionId = atom<string | null>({
+  key: 'conferenceCurrentSessionId',
+  default: null,
+});
 
 export default {
   conferenceGlobalContext,
@@ -47,4 +52,5 @@ export default {
   conferenceSystemSegments,
   conferenceMicSegments,
   conferenceSuggestions,
+  conferenceCurrentSessionId,
 };

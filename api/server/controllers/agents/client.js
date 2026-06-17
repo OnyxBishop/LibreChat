@@ -53,6 +53,7 @@ const { encodeAndFormat } = require('~/server/services/Files/images/encode');
 const { createContextHandlers } = require('~/app/clients/prompts');
 const { resolveConfigServers } = require('~/server/services/MCP');
 const { getMCPServerTools } = require('~/server/services/Config');
+const { buildFingerprintContext } = require('~/server/services/Fingerprints/context');
 const BaseClient = require('~/app/clients/BaseClient');
 const { getMCPManager } = require('~/config');
 const db = require('~/models');
@@ -365,6 +366,38 @@ class AgentClient extends BaseClient {
       }
     } catch (error) {
       logger.error('[AgentClient] Failed to inject skills index', error);
+    }
+
+    /**
+     * Digital fingerprints: surface the people/companies/products relevant to the current
+     * message so the model recalls obligations and key facts. Best-effort + time-boxed so a
+     * slow embedding provider can never delay the chat turn (it degrades to no injection).
+     */
+    try {
+      const fpUserId = this.options.req?.user?.id;
+      const fpQuery = typeof latestMessage?.text === 'string' ? latestMessage.text : '';
+      if (fpUserId && fpQuery.trim()) {
+        const fpContext = await Promise.race([
+          buildFingerprintContext({
+            req: this.options.req,
+            userId: fpUserId,
+            queryText: fpQuery,
+            limit: 4,
+          }),
+          new Promise((resolve) => setTimeout(() => resolve(''), 2500)),
+        ]);
+        if (fpContext) {
+          sharedRunContextParts.push(
+            '# Relevant fingerprints\n' +
+              'People, companies, and products the user tracks that are relevant to this message. ' +
+              'Use them to personalize your answer and remember who owes whom; do not mention this ' +
+              'section unless it is useful.\n\n' +
+              fpContext,
+          );
+        }
+      }
+    } catch (error) {
+      logger.error('[AgentClient] Failed to inject fingerprint context', error);
     }
 
     const sharedRunContext = sharedRunContextParts.join('\n\n');

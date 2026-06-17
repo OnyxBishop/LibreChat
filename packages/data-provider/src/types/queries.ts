@@ -265,6 +265,27 @@ export type TFingerprintSearchHit = TFingerprint & { score: number };
 
 export type TFingerprintSearchResponse = TFingerprintSearchHit[];
 
+export type TFingerprintExtractParams = {
+  text: string;
+  /** Custom endpoint name; omit to use the first configured custom endpoint. */
+  endpoint?: string;
+  model: string;
+};
+
+export type TFingerprintProposal = {
+  entityId: string;
+  entityName: string;
+  kind: TFingerprintFactKind;
+  text: string;
+  status?: string;
+  dueDate?: string;
+};
+
+export type TFingerprintExtractResponse = {
+  proposals: TFingerprintProposal[];
+  count: number;
+};
+
 export type PrincipalSearchParams = {
   q: string;
   limit?: number;

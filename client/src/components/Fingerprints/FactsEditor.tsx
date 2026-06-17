@@ -1,4 +1,4 @@
-import { Plus, X } from 'lucide-react';
+import { Check, Plus, Sparkles, X } from 'lucide-react';
 import type { TFingerprintFact } from 'librechat-data-provider';
 import { FACT_KINDS, FACT_KIND_LABEL_KEYS, type FactKind } from './constants';
 import { useLocalize } from '~/hooks';
@@ -53,11 +53,31 @@ export default function FactsEditor({ facts, onChange }: FactsEditorProps) {
             {rows.length === 0 ? (
               <p className="text-xs text-text-tertiary">{localize('com_fp_facts_empty')}</p>
             ) : (
-              rows.map(({ fact, index }) => (
+              rows.map(({ fact, index }) => {
+                const pending = fact.confirmed === false;
+                return (
                 <div
                   key={index}
-                  className="flex flex-col gap-1 rounded-md border border-border-light p-2"
+                  className={`flex flex-col gap-1 rounded-md border p-2 ${
+                    pending ? 'border-amber-500/60 bg-amber-500/5' : 'border-border-light'
+                  }`}
                 >
+                  {pending && (
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600">
+                        <Sparkles className="h-3 w-3" />
+                        {localize('com_fp_fact_pending')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateFact(index, { confirmed: true })}
+                        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-green-600 hover:bg-surface-hover"
+                      >
+                        <Check className="h-3 w-3" />
+                        {localize('com_fp_fact_confirm')}
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-start gap-2">
                     {kind === 'attribute' && (
                       <input
@@ -102,7 +122,8 @@ export default function FactsEditor({ facts, onChange }: FactsEditorProps) {
                     </div>
                   )}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         );

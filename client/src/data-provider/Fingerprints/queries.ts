@@ -9,6 +9,8 @@ import type {
   TFingerprintsResponse,
   TFingerprintSearchParams,
   TFingerprintSearchResponse,
+  TFingerprintExtractParams,
+  TFingerprintExtractResponse,
 } from 'librechat-data-provider';
 
 export const useGetFingerprintsQuery = (
@@ -82,5 +84,22 @@ export const useSearchFingerprintsMutation = (
   return useMutation<TFingerprintSearchResponse, Error, TFingerprintSearchParams>(
     (params) => dataService.searchFingerprints(params),
     options,
+  );
+};
+
+/** AI fact extraction — drafts unconfirmed facts onto known entities; invalidates the list. */
+export const useExtractFingerprintFactsMutation = (
+  options?: UseMutationOptions<TFingerprintExtractResponse, Error, TFingerprintExtractParams>,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation<TFingerprintExtractResponse, Error, TFingerprintExtractParams>(
+    (params) => dataService.extractFingerprintFacts(params),
+    {
+      ...options,
+      onSuccess: (...params) => {
+        queryClient.invalidateQueries([QueryKeys.fingerprints]);
+        options?.onSuccess?.(...params);
+      },
+    },
   );
 };

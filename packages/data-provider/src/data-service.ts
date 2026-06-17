@@ -1126,6 +1126,12 @@ export const reembedFingerprints = (): Promise<{ count: number }> => {
   return request.post(endpoints.fingerprintReembed(), {});
 };
 
+export const extractFingerprintFacts = (
+  params: q.TFingerprintExtractParams,
+): Promise<q.TFingerprintExtractResponse> => {
+  return request.post(endpoints.fingerprintExtract(), params);
+};
+
 export function searchPrincipals(
   params: q.PrincipalSearchParams,
 ): Promise<q.PrincipalSearchResponse> {

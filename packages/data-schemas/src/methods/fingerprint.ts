@@ -139,6 +139,24 @@ export function createFingerprintMethods(mongoose: typeof import('mongoose')) {
     return { deleted: !!result };
   }
 
+  /** Appends facts to an entity (used for AI-drafted, unconfirmed facts). */
+  async function appendFingerprintFacts({
+    author,
+    id,
+    facts,
+  }: {
+    author: Author;
+    id: string;
+    facts: IFingerprintFact[];
+  }): Promise<IFingerprint | null> {
+    const Fingerprint = getModel();
+    return (await Fingerprint.findOneAndUpdate(
+      { _id: id, author },
+      { $push: { facts: { $each: facts } } },
+      { new: true },
+    ).lean()) as unknown as IFingerprint | null;
+  }
+
   /** Stores the semantic-search vector for an entity (separate from the public update path). */
   async function setFingerprintEmbedding({
     author,
@@ -224,6 +242,7 @@ export function createFingerprintMethods(mongoose: typeof import('mongoose')) {
     createFingerprint,
     updateFingerprint,
     deleteFingerprint,
+    appendFingerprintFacts,
     setFingerprintEmbedding,
     getFingerprintsNeedingEmbedding,
     semanticSearch,

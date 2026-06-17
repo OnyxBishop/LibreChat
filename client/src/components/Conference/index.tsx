@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
-import { Mic, MicOff, Radio, Send, Loader2, Trash2, History, Download } from 'lucide-react';
+import { Mic, MicOff, Radio, Send, Loader2, Trash2, History, Download, Sparkles } from 'lucide-react';
+import { useToastContext } from '@librechat/client';
 import type { TFile } from 'librechat-data-provider';
 import type { RecorderError } from '~/hooks/Conference/useConferenceRecorder';
 import useConferenceRecorder from '~/hooks/Conference/useConferenceRecorder';
@@ -9,6 +10,7 @@ import useConferenceAssist from '~/hooks/Conference/useConferenceAssist';
 import useConferenceAutosave from '~/hooks/Conference/useConferenceAutosave';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
 import { downloadTranscript } from '~/utils/conferenceTranscript';
+import { useExtractFingerprintFactsMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { useGetFiles } from '~/data-provider';
 import ConferenceSettings from './Settings';
@@ -70,6 +72,8 @@ export default function Conference() {
     .map((file) => ({ file_id: file.file_id, filename: file.filename }));
 
   const { isStreaming, requestAssist } = useConferenceAssist();
+  const { showToast } = useToastContext();
+  const extractFacts = useExtractFingerprintFactsMutation();
 
   /* refs to read the latest values inside long-lived recorder callbacks */
   const idRef = useRef(0);
@@ -116,6 +120,29 @@ export default function Conference() {
     ).finally(() => {
       setSuggestions((prev) => prev.map((s) => (s.id === id ? { ...s, pending: false } : s)));
     });
+  };
+
+  /* AI-draft facts about known participants/entities from the meeting transcript. */
+  const handleExtract = () => {
+    const transcript = getTranscript();
+    if (!transcript.trim() || !effectiveModel) {
+      return;
+    }
+    extractFacts.mutate(
+      { text: transcript, endpoint, model: effectiveModel },
+      {
+        onSuccess: (data) =>
+          showToast({
+            status: data.count > 0 ? 'success' : 'info',
+            message:
+              data.count > 0
+                ? localize('com_fp_extract_done', { count: data.count })
+                : localize('com_fp_extract_none'),
+          }),
+        onError: () =>
+          showToast({ status: 'error', message: localize('com_fp_extract_error') }),
+      },
+    );
   };
 
   /* recorders — fresh closures each render so they always see current state */
@@ -324,6 +351,20 @@ export default function Conference() {
               <Send className="h-4 w-4" />
             )}
             {localize('com_conf_help_reply')}
+          </button>
+
+          <button
+            onClick={handleExtract}
+            disabled={extractFacts.isLoading || systemSegments.length === 0 || !effectiveModel}
+            title={localize('com_fp_extract_hint')}
+            className="flex items-center gap-2 rounded-md bg-surface-tertiary px-3 py-2 text-sm font-medium text-text-primary hover:bg-surface-hover disabled:opacity-50"
+          >
+            {extractFacts.isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {localize('com_fp_extract')}
           </button>
 
           {autoSend && (

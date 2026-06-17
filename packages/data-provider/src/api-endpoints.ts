@@ -427,6 +427,7 @@ export const fingerprints = (type?: string) =>
 export const fingerprint = (id: string) => `${BASE_URL}/api/fingerprints/${id}`;
 export const fingerprintSearch = () => `${BASE_URL}/api/fingerprints/search`;
 export const fingerprintReembed = () => `${BASE_URL}/api/fingerprints/reembed`;
+export const fingerprintExtract = () => `${BASE_URL}/api/fingerprints/extract`;
 
 export const searchPrincipals = (params: q.PrincipalSearchParams) => {
   const { q: query, limit, types } = params;

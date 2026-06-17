@@ -1,5 +1,10 @@
 const express = require('express');
-const { embedText, buildEmbeddingText, getEmbeddingModel } = require('@librechat/api');
+const {
+  embedText,
+  buildEmbeddingText,
+  getEmbeddingModel,
+  extractFacts,
+} = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const {
   getFingerprints,
@@ -7,6 +12,7 @@ const {
   createFingerprint,
   updateFingerprint,
   deleteFingerprint,
+  appendFingerprintFacts,
   setFingerprintEmbedding,
   getFingerprintsNeedingEmbedding,
   semanticSearch,
@@ -247,6 +253,73 @@ router.post('/reembed', async (req, res) => {
   } catch (error) {
     logger.error('[/fingerprints/reembed] error', error);
     res.status(500).json({ message: 'Error re-embedding fingerprints' });
+  }
+});
+
+/**
+ * @route POST /api/fingerprints/extract
+ * @desc AI-drafts facts about known entities from free text (a meeting transcript or
+ *       message) and stores them as unconfirmed (`confirmed:false`) for the user to review.
+ *       Unconfirmed facts are excluded from the embedding and the injected context until
+ *       confirmed, so a draft never pollutes search or model prompts.
+ * @access Private
+ */
+router.post('/extract', async (req, res) => {
+  const { text, endpoint, model } = req.body || {};
+  if (typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ message: 'text is required' });
+  }
+  if (typeof model !== 'string' || !model.trim()) {
+    return res.status(400).json({ message: 'model is required' });
+  }
+  try {
+    const entities = await getFingerprints(req.user.id);
+    const known = entities.map((entity) => ({
+      id: String(entity._id),
+      name: entity.name,
+      type: entity.type,
+      aliases: entity.aliases,
+    }));
+    if (known.length === 0) {
+      return res.status(200).json({ proposals: [], count: 0 });
+    }
+    const nameById = new Map(known.map((entity) => [entity.id, entity.name]));
+
+    const proposals = await extractFacts({
+      appConfig: req.config,
+      endpoint,
+      model: model.trim(),
+      text,
+      entities: known,
+    });
+
+    /** Group by entity and persist each draft fact as unconfirmed. */
+    const byEntity = new Map();
+    for (const proposal of proposals) {
+      if (!byEntity.has(proposal.entityId)) {
+        byEntity.set(proposal.entityId, []);
+      }
+      byEntity.get(proposal.entityId).push({
+        kind: proposal.kind,
+        text: proposal.text,
+        status: typeof proposal.status === 'string' ? proposal.status : '',
+        ...(proposal.dueDate ? { dueDate: proposal.dueDate } : {}),
+        source: 'ai',
+        confirmed: false,
+      });
+    }
+    for (const [id, facts] of byEntity) {
+      await appendFingerprintFacts({ author: req.user.id, id, facts });
+    }
+
+    const enriched = proposals.map((proposal) => ({
+      ...proposal,
+      entityName: nameById.get(proposal.entityId) ?? '',
+    }));
+    res.status(200).json({ proposals: enriched, count: enriched.length });
+  } catch (error) {
+    logger.error('[/fingerprints/extract] error', error);
+    res.status(500).json({ message: 'Error extracting facts' });
   }
 });
 

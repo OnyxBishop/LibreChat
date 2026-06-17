@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Sparkles, Trash2 } from 'lucide-react';
 import type { TFingerprint } from 'librechat-data-provider';
 import { FACT_KINDS, FACT_KIND_LABEL_KEYS, TYPE_LABEL_KEYS } from './constants';
 import { useLocalize } from '~/hooks';
@@ -18,6 +18,8 @@ export default function FingerprintCard({ entity, onEdit, onDelete }: Fingerprin
     count: entity.facts.filter((fact) => fact.kind === kind).length,
   })).filter((entry) => entry.count > 0);
 
+  const pendingCount = entity.facts.filter((fact) => fact.confirmed === false).length;
+
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border-light bg-surface-secondary p-4">
       <div className="flex items-start justify-between gap-2">
@@ -31,9 +33,20 @@ export default function FingerprintCard({ entity, onEdit, onDelete }: Fingerprin
             </span>
           )}
         </div>
-        <span className="shrink-0 rounded-full bg-surface-tertiary px-2 py-0.5 text-xs text-text-secondary">
-          {localize(typeKey)}
-        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          {pendingCount > 0 && (
+            <span
+              className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600"
+              title={localize('com_fp_fact_pending')}
+            >
+              <Sparkles className="h-3 w-3" />
+              {pendingCount}
+            </span>
+          )}
+          <span className="rounded-full bg-surface-tertiary px-2 py-0.5 text-xs text-text-secondary">
+            {localize(typeKey)}
+          </span>
+        </div>
       </div>
 
       {entity.summary && (

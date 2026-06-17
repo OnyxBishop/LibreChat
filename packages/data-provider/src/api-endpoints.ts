@@ -421,6 +421,13 @@ export const skillImport = () => `${skills()}/import`;
 export const conferenceSessions = () => `${BASE_URL}/api/conference/sessions`;
 export const conferenceSession = (id: string) => `${conferenceSessions()}/${id}`;
 
+/* Fingerprints (CRM entities) */
+export const fingerprints = (type?: string) =>
+  `${BASE_URL}/api/fingerprints${type ? `?type=${encodeURIComponent(type)}` : ''}`;
+export const fingerprint = (id: string) => `${BASE_URL}/api/fingerprints/${id}`;
+export const fingerprintSearch = () => `${BASE_URL}/api/fingerprints/search`;
+export const fingerprintReembed = () => `${BASE_URL}/api/fingerprints/reembed`;
+
 export const searchPrincipals = (params: q.PrincipalSearchParams) => {
   const { q: query, limit, types } = params;
   let url = `${BASE_URL}/api/permissions/search-principals?q=${encodeURIComponent(query)}`;

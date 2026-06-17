@@ -1092,6 +1092,40 @@ export const deleteConferenceSession = (id: string): Promise<{ message: string }
   return request.delete(endpoints.conferenceSession(id));
 };
 
+/* Fingerprints (CRM entities) */
+export const getFingerprints = (type?: string): Promise<q.TFingerprintsResponse> => {
+  return request.get(endpoints.fingerprints(type));
+};
+
+export const getFingerprint = (id: string): Promise<q.TFingerprint> => {
+  return request.get(endpoints.fingerprint(id));
+};
+
+export const createFingerprint = (data: q.TCreateFingerprint): Promise<q.TFingerprint> => {
+  return request.post(endpoints.fingerprints(), data);
+};
+
+export const updateFingerprint = (
+  id: string,
+  data: q.TUpdateFingerprint,
+): Promise<q.TFingerprint> => {
+  return request.patch(endpoints.fingerprint(id), data);
+};
+
+export const deleteFingerprint = (id: string): Promise<{ message: string }> => {
+  return request.delete(endpoints.fingerprint(id));
+};
+
+export const searchFingerprints = (
+  params: q.TFingerprintSearchParams,
+): Promise<q.TFingerprintSearchResponse> => {
+  return request.post(endpoints.fingerprintSearch(), params);
+};
+
+export const reembedFingerprints = (): Promise<{ count: number }> => {
+  return request.post(endpoints.fingerprintReembed(), {});
+};
+
 export function searchPrincipals(
   params: q.PrincipalSearchParams,
 ): Promise<q.PrincipalSearchResponse> {

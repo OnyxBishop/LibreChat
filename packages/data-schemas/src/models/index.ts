@@ -21,6 +21,7 @@ import { createPromptModel } from './prompt';
 import { createPromptGroupModel } from './promptGroup';
 import { createSkillModel } from './skill';
 import { createConferenceSessionModel } from './conference';
+import { createFingerprintModel } from './fingerprint';
 import { createConversationTagModel } from './conversationTag';
 import { createSharedLinkModel } from './sharedLink';
 import { createToolCallModel } from './toolCall';
@@ -59,6 +60,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     PromptGroup: createPromptGroupModel(mongoose),
     Skill: createSkillModel(mongoose),
     ConferenceSession: createConferenceSessionModel(mongoose),
+    Fingerprint: createFingerprintModel(mongoose),
     ConversationTag: createConversationTagModel(mongoose),
     SharedLink: createSharedLinkModel(mongoose),
     ToolCall: createToolCallModel(mongoose),

@@ -122,6 +122,11 @@ export const router = createBrowserRouter(
                 import('~/components/Conference').then((m) => ({ Component: m.default })),
             },
             {
+              path: 'fingerprints',
+              lazy: () =>
+                import('~/components/Fingerprints').then((m) => ({ Component: m.default })),
+            },
+            {
               path: 'prompts',
               element: <Navigate to="/prompts/new" replace={true} />,
             },

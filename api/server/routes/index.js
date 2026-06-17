@@ -24,6 +24,7 @@ const convos = require('./convos');
 const config = require('./config');
 const agents = require('./agents');
 const conference = require('./conference');
+const fingerprints = require('./fingerprints');
 const roles = require('./roles');
 const oauth = require('./oauth');
 const files = require('./files');
@@ -54,6 +55,7 @@ module.exports = {
   banner,
   agents,
   conference,
+  fingerprints,
   convos,
   search,
   config,

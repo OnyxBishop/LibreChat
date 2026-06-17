@@ -208,6 +208,63 @@ export type TUpdateConferenceSession = TCreateConferenceSession;
 
 export type TConferenceSessionsResponse = TConferenceSession[];
 
+/* Fingerprints (CRM entities) */
+export type TFingerprintFactKind = 'attribute' | 'they_owe_us' | 'we_owe_them' | 'note';
+
+export type TFingerprintFact = {
+  _id?: string;
+  kind: TFingerprintFactKind;
+  label?: string;
+  text: string;
+  status?: string;
+  dueDate?: string;
+  source?: string;
+  sourceRefId?: string;
+  confirmed?: boolean;
+};
+
+export type TFingerprintRelation = {
+  entityId: string;
+  role?: string;
+};
+
+export type TFingerprint = {
+  _id: string;
+  type: string;
+  name: string;
+  aliases: string[];
+  summary: string;
+  facts: TFingerprintFact[];
+  relations: TFingerprintRelation[];
+  tags: string[];
+  author?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TCreateFingerprint = {
+  type?: string;
+  name: string;
+  aliases?: string[];
+  summary?: string;
+  facts?: TFingerprintFact[];
+  relations?: TFingerprintRelation[];
+  tags?: string[];
+};
+
+export type TUpdateFingerprint = Partial<TCreateFingerprint>;
+
+export type TFingerprintsResponse = TFingerprint[];
+
+export type TFingerprintSearchParams = {
+  query: string;
+  limit?: number;
+};
+
+export type TFingerprintSearchHit = TFingerprint & { score: number };
+
+export type TFingerprintSearchResponse = TFingerprintSearchHit[];
+
 export type PrincipalSearchParams = {
   q: string;
   limit?: number;

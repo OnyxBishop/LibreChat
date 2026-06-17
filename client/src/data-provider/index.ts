@@ -8,6 +8,8 @@ export * from './Memories';
 export * from './Skills';
 /* Conference sessions */
 export * from './Conference';
+/* Fingerprints (CRM entities) */
+export * from './Fingerprints';
 export * from './Messages';
 export * from './Misc';
 export * from './Tools';

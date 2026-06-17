@@ -180,6 +180,7 @@ const startServer = async () => {
   app.use('/api/roles', routes.roles);
   app.use('/api/agents', routes.agents);
   app.use('/api/conference', routes.conference);
+  app.use('/api/fingerprints', routes.fingerprints);
   app.use('/api/banner', routes.banner);
   app.use('/api/memories', routes.memories);
   app.use('/api/skills', routes.skills);

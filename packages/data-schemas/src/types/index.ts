@@ -27,6 +27,8 @@ export * from './prompts';
 export * from './skill';
 /* Conference sessions */
 export * from './conference';
+/* Fingerprints (CRM entities) */
+export * from './fingerprint';
 /* Access Control */
 export * from './accessRole';
 export * from './aclEntry';

@@ -33,6 +33,7 @@ import {
   createConferenceSessionMethods,
   type ConferenceSessionMethods,
 } from './conference';
+import { createFingerprintMethods, type FingerprintMethods } from './fingerprint';
 /* Tier 2 — Moderate (service deps injected) */
 import { createConversationTagMethods, type ConversationTagMethods } from './conversationTag';
 import { createMessageMethods, type MessageMethods } from './message';
@@ -82,6 +83,7 @@ export type AllMethods = UserMethods &
   PresetMethods &
   SkillMethods &
   ConferenceSessionMethods &
+  FingerprintMethods &
   ConversationTagMethods &
   MessageMethods &
   ConversationMethods &
@@ -202,6 +204,7 @@ export function createMethods(
     ...createPresetMethods(mongoose),
     ...createSkillMethods(mongoose),
     ...createConferenceSessionMethods(mongoose),
+    ...createFingerprintMethods(mongoose),
     /* Tier 2 */
     ...createConversationTagMethods(mongoose),
     ...messageMethods,
@@ -243,6 +246,7 @@ export type {
   PresetMethods,
   SkillMethods,
   ConferenceSessionMethods,
+  FingerprintMethods,
   ConversationTagMethods,
   MessageMethods,
   ConversationMethods,

@@ -57,6 +57,8 @@ export enum QueryKeys {
   skills = 'skills',
   /* Conference sessions */
   conferenceSessions = 'conferenceSessions',
+  /* Fingerprints (CRM entities) */
+  fingerprints = 'fingerprints',
   principalSearch = 'principalSearch',
   accessRoles = 'accessRoles',
   resourcePermissions = 'resourcePermissions',

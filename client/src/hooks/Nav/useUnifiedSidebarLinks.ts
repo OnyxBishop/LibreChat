@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useNavigate } from 'react-router-dom';
-import { MessagesSquare, Radio } from 'lucide-react';
+import { MessagesSquare, Radio, Fingerprint } from 'lucide-react';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField } from 'librechat-data-provider';
 import type { TEndpointsConfig } from 'librechat-data-provider';
@@ -68,7 +68,15 @@ export default function useUnifiedSidebarLinks() {
       onClick: () => navigate('/conference'),
     };
 
-    return [conversationLink, conferenceLink, ...sideNavLinks];
+    const fingerprintLink: NavLink = {
+      title: 'com_nav_fingerprints',
+      label: '',
+      icon: Fingerprint,
+      id: 'fingerprints',
+      onClick: () => navigate('/fingerprints'),
+    };
+
+    return [conversationLink, conferenceLink, fingerprintLink, ...sideNavLinks];
   }, [sideNavLinks, navigate]);
 
   return links;

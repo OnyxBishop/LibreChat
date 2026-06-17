@@ -43,6 +43,8 @@ export * from './endpoints';
 export * from './files';
 /* Conference assistant */
 export * from './conference';
+/* Fingerprints (CRM entities) */
+export * from './fingerprint';
 /* Storage */
 export * from './storage';
 /* Tools */

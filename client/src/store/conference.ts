@@ -41,6 +41,11 @@ const conferenceCurrentSessionId = atom<string | null>({
   key: 'conferenceCurrentSessionId',
   default: null,
 });
+/** Ids of the digital fingerprints the user marked as participants of this meeting. */
+const conferenceParticipantIds = atom<string[]>({
+  key: 'conferenceParticipantIds',
+  default: [],
+});
 
 export default {
   conferenceGlobalContext,
@@ -53,4 +58,5 @@ export default {
   conferenceMicSegments,
   conferenceSuggestions,
   conferenceCurrentSessionId,
+  conferenceParticipantIds,
 };

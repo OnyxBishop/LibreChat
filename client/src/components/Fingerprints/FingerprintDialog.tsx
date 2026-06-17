@@ -14,6 +14,10 @@ interface FingerprintDialogProps {
   setOpen: (open: boolean) => void;
   /** When present, the dialog edits this entity; otherwise it creates a new one. */
   entity?: TFingerprint | null;
+  /** Default type for a new entity (e.g. 'person' when adding a meeting participant). */
+  defaultType?: string;
+  /** Fires with the newly created entity (create flow only) — e.g. to auto-select it. */
+  onCreated?: (entity: TFingerprint) => void;
 }
 
 const inputClass =
@@ -28,7 +32,13 @@ function splitList(value: string): string[] {
     .filter(Boolean);
 }
 
-export default function FingerprintDialog({ open, setOpen, entity }: FingerprintDialogProps) {
+export default function FingerprintDialog({
+  open,
+  setOpen,
+  entity,
+  defaultType = 'person',
+  onCreated,
+}: FingerprintDialogProps) {
   const localize = useLocalize();
   const createMutation = useCreateFingerprintMutation();
   const updateMutation = useUpdateFingerprintMutation();
@@ -45,13 +55,13 @@ export default function FingerprintDialog({ open, setOpen, entity }: Fingerprint
     if (!open) {
       return;
     }
-    setType(entity?.type ?? 'person');
+    setType(entity?.type ?? defaultType);
     setName(entity?.name ?? '');
     setAliasesText((entity?.aliases ?? []).join(', '));
     setSummary(entity?.summary ?? '');
     setTagsText((entity?.tags ?? []).join(', '));
     setFacts(entity?.facts ?? []);
-  }, [open, entity]);
+  }, [open, entity, defaultType]);
 
   const isSaving = createMutation.isLoading || updateMutation.isLoading;
   const canSave = name.trim().length > 0 && !isSaving;
@@ -68,11 +78,15 @@ export default function FingerprintDialog({ open, setOpen, entity }: Fingerprint
       tags: splitList(tagsText),
       facts: facts.filter((fact) => fact.text.trim().length > 0),
     };
-    const onSuccess = () => setOpen(false);
     if (entity?._id) {
-      updateMutation.mutate({ id: entity._id, data: payload }, { onSuccess });
+      updateMutation.mutate({ id: entity._id, data: payload }, { onSuccess: () => setOpen(false) });
     } else {
-      createMutation.mutate(payload, { onSuccess });
+      createMutation.mutate(payload, {
+        onSuccess: (created) => {
+          onCreated?.(created);
+          setOpen(false);
+        },
+      });
     }
   };
 

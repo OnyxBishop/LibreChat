@@ -10,6 +10,8 @@ interface AssistParams {
   transcript: string;
   useRag: boolean;
   fileIds: string[];
+  /** Ids of the digital fingerprints marked as meeting participants. */
+  participantIds: string[];
 }
 
 interface UseConferenceAssistReturn {
@@ -58,6 +60,7 @@ export default function useConferenceAssist(): UseConferenceAssistReturn {
             transcript: params.transcript,
             useRag: params.useRag,
             file_ids: params.fileIds,
+            participantIds: params.participantIds,
           }),
           signal: controller.signal,
         });

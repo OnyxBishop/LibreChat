@@ -7,6 +7,7 @@ const {
   updateConferenceSession,
   deleteConferenceSession,
 } = require('~/models');
+const { buildFingerprintContext } = require('~/server/services/Fingerprints/context');
 const { requireJwtAuth, checkBan, configMiddleware } = require('~/server/middleware');
 
 const router = express.Router();
@@ -18,9 +19,28 @@ router.use(configMiddleware);
 /**
  * @route POST /api/conference/assist
  * @desc Streams a meeting-reply suggestion (SSE) from the configured custom endpoint.
+ *       Augments the prompt with the digital-fingerprint context of named
+ *       participants + entities semantically matched from the transcript.
  * @access Private
  */
-router.post('/assist', (req, res) => conferenceAssist(req, res));
+router.post('/assist', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const transcript = typeof body.transcript === 'string' ? body.transcript : '';
+    const participantIds = Array.isArray(body.participantIds) ? body.participantIds : [];
+    if (req.user?.id && (participantIds.length > 0 || transcript.trim())) {
+      req.body.fingerprintContext = await buildFingerprintContext({
+        req,
+        userId: req.user.id,
+        participantIds,
+        queryText: transcript,
+      });
+    }
+  } catch (error) {
+    logger.error('[conference] fingerprint context skipped', error);
+  }
+  return conferenceAssist(req, res);
+});
 
 /** Trims session arrays to the persisted shape (text + optional timestamp). */
 function sanitizeSegments(segments) {

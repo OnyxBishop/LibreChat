@@ -21,6 +21,10 @@ interface ConferenceAssistBody {
   useRag?: boolean;
   /** File ids to search when `useRag` is enabled. */
   file_ids?: string[];
+  /** Ids of the meeting participants/entities (digital fingerprints) the user selected. */
+  participantIds?: string[];
+  /** Pre-built fingerprint context block, injected by the route layer (has DB access). */
+  fingerprintContext?: string;
 }
 
 /** A single RAG match returned by the rag_api `/query` endpoint. */
@@ -185,6 +189,15 @@ export async function conferenceAssist(req: ServerRequest, res: Response): Promi
   const globalContext = typeof body.globalContext === 'string' ? body.globalContext.trim() : '';
   if (globalContext) {
     systemParts.push(`Additional context provided by the user:\n${globalContext}`);
+  }
+  const fingerprintContext =
+    typeof body.fingerprintContext === 'string' ? body.fingerprintContext.trim() : '';
+  if (fingerprintContext) {
+    systemParts.push(
+      'Known people/entities relevant to this meeting (use to personalize your reply and ' +
+        'remember obligations; do NOT read this list aloud):\n' +
+        fingerprintContext,
+    );
   }
   if (ragContext) {
     systemParts.push(

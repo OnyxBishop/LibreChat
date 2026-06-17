@@ -12,6 +12,7 @@ import { downloadTranscript } from '~/utils/conferenceTranscript';
 import { useLocalize } from '~/hooks';
 import { useGetFiles } from '~/data-provider';
 import ConferenceSettings from './Settings';
+import ParticipantBar from './ParticipantBar';
 import HistoryDialog from './HistoryDialog';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -49,6 +50,7 @@ export default function Conference() {
   const [micSegments, setMicSegments] = useRecoilState(store.conferenceMicSegments);
   const [suggestions, setSuggestions] = useRecoilState(store.conferenceSuggestions);
   const setCurrentSessionId = useSetRecoilState(store.conferenceCurrentSessionId);
+  const [participantIds, setParticipantIds] = useRecoilState(store.conferenceParticipantIds);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   /* persist the live transcript to the server as it grows */
@@ -105,6 +107,7 @@ export default function Conference() {
         transcript,
         useRag,
         fileIds,
+        participantIds,
       },
       (token) =>
         setSuggestions((prev) =>
@@ -146,6 +149,7 @@ export default function Conference() {
     setMicSegments([]);
     setSuggestions([]);
     setCurrentSessionId(null);
+    setParticipantIds([]);
     lastSentLenRef.current = 0;
   };
 
@@ -206,6 +210,9 @@ export default function Conference() {
             </button>
           </div>
         </header>
+
+        {/* meeting participants (digital fingerprints) */}
+        <ParticipantBar />
 
         {/* transcript + suggestions */}
         <div className="flex min-h-0 flex-1">

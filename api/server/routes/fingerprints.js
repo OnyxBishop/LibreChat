@@ -18,6 +18,7 @@ const {
   semanticSearch,
 } = require('~/models');
 const { requireJwtAuth, checkBan, configMiddleware } = require('~/server/middleware');
+const { resolveRelevantFingerprints } = require('~/server/services/Fingerprints/context');
 
 const router = express.Router();
 
@@ -257,6 +258,60 @@ router.post('/reembed', async (req, res) => {
 });
 
 /**
+ * Runs extraction against a fixed set of KNOWN entities, persists each proposal as an
+ * unconfirmed (`confirmed:false`) draft fact, and returns proposals enriched with the
+ * entity name. Shared by the conference (`/extract`, all entities) and chat
+ * (`/extract-chat`, only the entities a turn is about) routes.
+ */
+async function runExtraction(req, { known, endpoint, model, text }) {
+  if (known.length === 0) {
+    return [];
+  }
+  const nameById = new Map(known.map((entity) => [entity.id, entity.name]));
+  const proposals = await extractFacts({
+    appConfig: req.config,
+    endpoint,
+    model,
+    text,
+    entities: known,
+  });
+
+  /** Group by entity and persist each draft fact as unconfirmed. */
+  const byEntity = new Map();
+  for (const proposal of proposals) {
+    if (!byEntity.has(proposal.entityId)) {
+      byEntity.set(proposal.entityId, []);
+    }
+    byEntity.get(proposal.entityId).push({
+      kind: proposal.kind,
+      text: proposal.text,
+      status: typeof proposal.status === 'string' ? proposal.status : '',
+      ...(proposal.dueDate ? { dueDate: proposal.dueDate } : {}),
+      source: 'ai',
+      confirmed: false,
+    });
+  }
+  for (const [id, facts] of byEntity) {
+    await appendFingerprintFacts({ author: req.user.id, id, facts });
+  }
+
+  return proposals.map((proposal) => ({
+    ...proposal,
+    entityName: nameById.get(proposal.entityId) ?? '',
+  }));
+}
+
+/** Maps lean entity docs to the compact shape the extractor grounds against. */
+function toKnownEntities(entities) {
+  return entities.map((entity) => ({
+    id: String(entity._id),
+    name: entity.name,
+    type: entity.type,
+    aliases: entity.aliases,
+  }));
+}
+
+/**
  * @route POST /api/fingerprints/extract
  * @desc AI-drafts facts about known entities from free text (a meeting transcript or
  *       message) and stores them as unconfirmed (`confirmed:false`) for the user to review.
@@ -273,52 +328,52 @@ router.post('/extract', async (req, res) => {
     return res.status(400).json({ message: 'model is required' });
   }
   try {
-    const entities = await getFingerprints(req.user.id);
-    const known = entities.map((entity) => ({
-      id: String(entity._id),
-      name: entity.name,
-      type: entity.type,
-      aliases: entity.aliases,
-    }));
-    if (known.length === 0) {
-      return res.status(200).json({ proposals: [], count: 0 });
-    }
-    const nameById = new Map(known.map((entity) => [entity.id, entity.name]));
-
-    const proposals = await extractFacts({
-      appConfig: req.config,
-      endpoint,
-      model: model.trim(),
-      text,
-      entities: known,
-    });
-
-    /** Group by entity and persist each draft fact as unconfirmed. */
-    const byEntity = new Map();
-    for (const proposal of proposals) {
-      if (!byEntity.has(proposal.entityId)) {
-        byEntity.set(proposal.entityId, []);
-      }
-      byEntity.get(proposal.entityId).push({
-        kind: proposal.kind,
-        text: proposal.text,
-        status: typeof proposal.status === 'string' ? proposal.status : '',
-        ...(proposal.dueDate ? { dueDate: proposal.dueDate } : {}),
-        source: 'ai',
-        confirmed: false,
-      });
-    }
-    for (const [id, facts] of byEntity) {
-      await appendFingerprintFacts({ author: req.user.id, id, facts });
-    }
-
-    const enriched = proposals.map((proposal) => ({
-      ...proposal,
-      entityName: nameById.get(proposal.entityId) ?? '',
-    }));
+    const known = toKnownEntities(await getFingerprints(req.user.id));
+    const enriched = await runExtraction(req, { known, endpoint, model: model.trim(), text });
     res.status(200).json({ proposals: enriched, count: enriched.length });
   } catch (error) {
     logger.error('[/fingerprints/extract] error', error);
+    res.status(500).json({ message: 'Error extracting facts' });
+  }
+});
+
+/**
+ * @route POST /api/fingerprints/extract-chat
+ * @desc Auto-drafts facts from a chat turn, scoped to the entities the turn is actually
+ *       about: explicitly @-mentioned ids merged with semantic matches over the message.
+ *       Unlike `/extract` this never grounds against the whole CRM (cheaper prompt, less
+ *       noise) and silently no-ops when nothing is relevant or no extract model resolves.
+ *       The model defaults to `FINGERPRINT_EXTRACT_MODEL` so extraction can run on a cheap
+ *       model independent of the chat's selected one.
+ * @access Private
+ */
+router.post('/extract-chat', async (req, res) => {
+  const { text, fingerprintIds, endpoint, model } = req.body || {};
+  if (typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ message: 'text is required' });
+  }
+  const extractModel =
+    typeof model === 'string' && model.trim()
+      ? model.trim()
+      : (process.env.FINGERPRINT_EXTRACT_MODEL || '').trim();
+  if (!extractModel) {
+    return res.status(200).json({ proposals: [], count: 0 });
+  }
+  try {
+    const entities = await resolveRelevantFingerprints({
+      req,
+      userId: req.user.id,
+      participantIds: Array.isArray(fingerprintIds) ? fingerprintIds : [],
+      queryText: text,
+    });
+    if (entities.length === 0) {
+      return res.status(200).json({ proposals: [], count: 0 });
+    }
+    const known = toKnownEntities(entities);
+    const enriched = await runExtraction(req, { known, endpoint, model: extractModel, text });
+    res.status(200).json({ proposals: enriched, count: enriched.length });
+  } catch (error) {
+    logger.error('[/fingerprints/extract-chat] error', error);
     res.status(500).json({ message: 'Error extracting facts' });
   }
 });

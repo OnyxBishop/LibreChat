@@ -507,6 +507,7 @@
   "com_fp_extract_done": "AI drafted {{count}} fact(s) — review in Fingerprints",
   "com_fp_extract_none": "No new facts found.",
   "com_fp_extract_error": "Fact extraction failed.",
+  "com_fp_chat_extract_toast": "AI noticed {{count}} new fact(s) — review in Fingerprints",
   "com_fp_mention_hint": "Attach a fingerprint to this message",
   "com_fp_mention_search": "Search fingerprints…",
   "com_fp_mention_empty": "No matching fingerprints.",

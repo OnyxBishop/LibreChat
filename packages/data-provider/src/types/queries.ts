@@ -272,6 +272,17 @@ export type TFingerprintExtractParams = {
   model: string;
 };
 
+/**
+ * Chat auto-extraction: scoped to @-mentioned + semantically matched entities. `model` is
+ * optional — the server falls back to `FINGERPRINT_EXTRACT_MODEL` and no-ops if neither set.
+ */
+export type TFingerprintExtractChatParams = {
+  text: string;
+  endpoint?: string;
+  model?: string;
+  fingerprintIds?: string[];
+};
+
 export type TFingerprintProposal = {
   entityId: string;
   entityName: string;

@@ -484,6 +484,7 @@
   "com_fp_extract_done": "ИИ предложил фактов: {{count}} — проверь в Отпечатках",
   "com_fp_extract_none": "Новых фактов не найдено.",
   "com_fp_extract_error": "Не удалось извлечь факты.",
+  "com_fp_chat_extract_toast": "ИИ заметил новых фактов: {{count}} — проверьте в «Отпечатках»",
   "com_fp_mention_hint": "Прикрепить отпечаток к сообщению",
   "com_fp_mention_search": "Поиск отпечатков…",
   "com_fp_mention_empty": "Совпадений не найдено.",

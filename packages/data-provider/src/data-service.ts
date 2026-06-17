@@ -1132,6 +1132,12 @@ export const extractFingerprintFacts = (
   return request.post(endpoints.fingerprintExtract(), params);
 };
 
+export const extractChatFingerprintFacts = (
+  params: q.TFingerprintExtractChatParams,
+): Promise<q.TFingerprintExtractResponse> => {
+  return request.post(endpoints.fingerprintExtractChat(), params);
+};
+
 export function searchPrincipals(
   params: q.PrincipalSearchParams,
 ): Promise<q.PrincipalSearchResponse> {

@@ -10,6 +10,7 @@ import type {
   TFingerprintSearchParams,
   TFingerprintSearchResponse,
   TFingerprintExtractParams,
+  TFingerprintExtractChatParams,
   TFingerprintExtractResponse,
 } from 'librechat-data-provider';
 
@@ -94,6 +95,23 @@ export const useExtractFingerprintFactsMutation = (
   const queryClient = useQueryClient();
   return useMutation<TFingerprintExtractResponse, Error, TFingerprintExtractParams>(
     (params) => dataService.extractFingerprintFacts(params),
+    {
+      ...options,
+      onSuccess: (...params) => {
+        queryClient.invalidateQueries([QueryKeys.fingerprints]);
+        options?.onSuccess?.(...params);
+      },
+    },
+  );
+};
+
+/** Chat auto-extraction — scoped drafts fired in the background after a chat turn. */
+export const useExtractChatFingerprintFactsMutation = (
+  options?: UseMutationOptions<TFingerprintExtractResponse, Error, TFingerprintExtractChatParams>,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation<TFingerprintExtractResponse, Error, TFingerprintExtractChatParams>(
+    (params) => dataService.extractChatFingerprintFacts(params),
     {
       ...options,
       onSuccess: (...params) => {

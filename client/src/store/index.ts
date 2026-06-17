@@ -12,6 +12,7 @@ import lang from './language';
 import settings from './settings';
 import misc from './misc';
 import conference from './conference';
+import fingerprints from './fingerprints';
 import isTemporary from './temporary';
 export * from './agents';
 export * from './mcp';
@@ -32,5 +33,6 @@ export default {
   ...settings,
   ...misc,
   ...conference,
+  ...fingerprints,
   ...isTemporary,
 };

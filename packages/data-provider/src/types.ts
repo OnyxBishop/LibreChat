@@ -120,6 +120,8 @@ export type TPayload = Partial<TMessage> &
     editedContent?: TEditedContent | null;
     /** Added conversation for multi-convo feature */
     addedConvo?: TConversation;
+    /** Digital fingerprint (CRM entity) ids the user explicitly attached to this message. */
+    fingerprintIds?: string[];
   };
 
 export type TEditedContent =
@@ -149,6 +151,8 @@ export type TSubmission = {
   editedContent?: TEditedContent | null;
   /** Added conversation for multi-convo feature */
   addedConvo?: TConversation;
+  /** Digital fingerprint (CRM entity) ids the user explicitly attached to this message. */
+  fingerprintIds?: string[];
 };
 
 export type EventSubmission = Omit<TSubmission, 'initialResponse'> & { initialResponse: TMessage };

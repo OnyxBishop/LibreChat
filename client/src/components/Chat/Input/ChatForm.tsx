@@ -35,6 +35,7 @@ import SendButton from './SendButton';
 import EditBadges from './EditBadges';
 import BadgeRow from './BadgeRow';
 import Mention from './Mention';
+import FingerprintMention from './FingerprintMention';
 import store from '~/store';
 
 interface ChatFormProps {
@@ -350,6 +351,7 @@ const ChatForm = memo(function ChatForm({
                   setFilesLoading={setFilesLoading}
                 />
               </div>
+              <FingerprintMention />
               <BadgeRow
                 showEphemeralBadges={
                   !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)

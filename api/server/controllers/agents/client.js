@@ -376,12 +376,16 @@ class AgentClient extends BaseClient {
     try {
       const fpUserId = this.options.req?.user?.id;
       const fpQuery = typeof latestMessage?.text === 'string' ? latestMessage.text : '';
-      if (fpUserId && fpQuery.trim()) {
+      const fpMentioned = Array.isArray(this.options.req?.body?.fingerprintIds)
+        ? this.options.req.body.fingerprintIds
+        : [];
+      if (fpUserId && (fpQuery.trim() || fpMentioned.length > 0)) {
         const fpContext = await Promise.race([
           buildFingerprintContext({
             req: this.options.req,
             userId: fpUserId,
             queryText: fpQuery,
+            participantIds: fpMentioned,
             limit: 4,
           }),
           new Promise((resolve) => setTimeout(() => resolve(''), 2500)),
